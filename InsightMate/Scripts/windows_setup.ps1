@@ -15,11 +15,15 @@ $pip = Join-Path $venvPath 'Scripts' 'pip.exe'
 Write-Host "Installing Python dependencies..."
 & $pip install -r (Join-Path $PSScriptRoot 'requirements.txt')
 
-$pythonExe = Join-Path $venvPath 'Scripts' 'python.exe'
-
-if (-not $env:OPENAI_API_KEY) {
-    $env:OPENAI_API_KEY = Read-Host -Prompt 'Enter your OpenAI API key'
+# Download the local Llama 3 model if Ollama is available
+if (Get-Command 'ollama' -ErrorAction SilentlyContinue) {
+    Write-Host "Downloading Llama 3 model via Ollama..."
+    ollama pull llama3
+} else {
+    Write-Warning "Ollama is not installed. Install it from https://ollama.ai/ to run Llama 3 locally."
 }
+
+$pythonExe = Join-Path $venvPath 'Scripts' 'python.exe'
 
 Write-Host "Starting InsightMate server..."
 & $pythonExe ai_server.py
