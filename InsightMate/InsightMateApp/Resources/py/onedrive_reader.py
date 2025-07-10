@@ -43,16 +43,13 @@ _def_cache: Optional[List[Dict[str, str]]] = None
 
 
 def index_files() -> List[Dict[str, str]]:
-    """Return cached list of OneDrive documents with metadata."""
     global _def_cache
     if _def_cache is None:
         _def_cache = sorted(_iter_files(), key=lambda f: f['modified'], reverse=True)
     return _def_cache
 
 
-
 def extract_text(path: str) -> str:
-    """Best-effort plain text extraction."""
     ext = Path(path).suffix.lower()
     try:
         if ext in {'.txt', '.md'}:
@@ -72,7 +69,6 @@ def extract_text(path: str) -> str:
 
 
 def search(query: str, limit: int = 5) -> List[Dict[str, str]]:
-    """Search filenames and content for the query."""
     results = []
     q = query.lower()
     for info in index_files():
@@ -96,4 +92,3 @@ def list_word_docs(limit: int = 20) -> List[str]:
 if __name__ == '__main__':
     for item in search('test'):
         print(f"{item['name']} - {item['path']}")
-

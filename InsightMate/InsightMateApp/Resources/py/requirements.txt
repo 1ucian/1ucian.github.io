@@ -9,4 +9,3 @@ PyPDF2
 python-docx
 textract
 dateparser
-
