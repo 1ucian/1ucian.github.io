@@ -43,6 +43,25 @@ python main.py "What's new?"
 
 The Flask server listens on `http://localhost:5000` and `main.py` writes the assistant reply to `/tmp/insight_output.txt`.
 
+## Windows Setup
+
+Windows users can run the same Python sources without Xcode. A helper PowerShell
+script is provided to create a virtual environment, install all requirements and
+launch the server.
+
+```powershell
+cd InsightMate\Scripts
+./windows_setup.ps1
+```
+
+The script prompts for your `OPENAI_API_KEY` if it is not already set and then
+starts `ai_server.py`. After the server is running you can invoke the main
+script:
+
+```powershell
+./venv/Scripts/python.exe main.py "What's new?"
+```
+
 ## OneDrive Local Access
 
 The `onedrive_reader.py` module automatically locates your OneDrive folder on Windows and indexes text, Markdown, Word and PDF documents. Queries about searching or listing files are routed to this reader and returned in the chat window.
