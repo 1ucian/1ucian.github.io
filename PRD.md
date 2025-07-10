@@ -38,6 +38,7 @@ InsightMate is a cross-platform personal assistant bundled within this repositor
 - Implement optional cloud sync so reminders and history can roam between devices.
 - Design a plugin architecture allowing community contributions for new data sources or automations.
 - Publish API documentation and a web portal on 1ucian.me for user guides and updates.
+- Leverage the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) platform so all components integrate seamlessly.
 
 ## Non‑Goals
 - Running the assistant as a hosted web service (the focus remains on local execution).

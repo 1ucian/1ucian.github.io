@@ -33,3 +33,6 @@ This repository contains the source for my personal site as well as **InsightMat
     you can review scheduled jobs and recent conversations.
 
 See [InsightMate/README.md](InsightMate/README.md) for more details.
+
+## MCP Integration
+InsightMate leverages the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) platform to centralize configuration and neatly integrate all components.
