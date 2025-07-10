@@ -5,15 +5,18 @@ import threading
 import time
 import requests
 import tkinter as tk
+from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 from PIL import Image
 import pystray
+from config import load_config, save_config
 
 class ChatGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("InsightMate")
         self.root.geometry("500x600")
+        self.config = load_config()
         self.root.configure(bg="#2b2b2b")
         self.tray = None
 
@@ -40,11 +43,38 @@ class ChatGUI:
         self.entry.pack(padx=10, pady=(0, 10), fill=tk.X)
         self.entry.bind("<Return>", self.send_message)
 
+        self.btn_frame = tk.Frame(root, bg=self.root['bg'])
+        self.btn_frame.pack(padx=10, pady=(0, 10), fill=tk.X)
+        tk.Button(self.btn_frame, text="Voice", command=self.voice_input).pack(side=tk.LEFT)
+        tk.Button(self.btn_frame, text="Settings", command=self.open_settings).pack(side=tk.RIGHT)
+
+        self.apply_theme()
+
         self.server_proc = None
         self.start_server()
 
         root.protocol("WM_DELETE_WINDOW", self.hide_window)
         root.bind("<Unmap>", self.on_minimize)
+
+    def apply_theme(self):
+        theme = self.config.get('theme', 'dark')
+        if theme == 'light':
+            bg_root = '#f0f0f0'
+            area_bg = '#ffffff'
+            area_fg = '#000000'
+            entry_bg = '#ffffff'
+            entry_fg = '#000000'
+        else:
+            bg_root = '#2b2b2b'
+            area_bg = '#1e1e1e'
+            area_fg = '#ffffff'
+            entry_bg = '#2b2b2b'
+            entry_fg = '#ffffff'
+        self.root.configure(bg=bg_root)
+        self.text_area.configure(bg=area_bg, fg=area_fg, insertbackground=area_fg)
+        self.entry.configure(bg=entry_bg, fg=entry_fg, insertbackground=entry_fg)
+        if hasattr(self, 'btn_frame'):
+            self.btn_frame.configure(bg=bg_root)
 
     def start_server(self):
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -77,6 +107,32 @@ class ChatGUI:
         self.entry.delete(0, tk.END)
         threading.Thread(target=self.call_api, args=(text,)).start()
 
+    def voice_input(self):
+        try:
+            import speech_recognition as sr
+        except ImportError:
+            self.add_message("Assistant", "speech_recognition not installed.")
+            return
+        recognizer = sr.Recognizer()
+        try:
+            with sr.Microphone() as source:
+                self.add_message("Assistant", "Listening...")
+                audio = recognizer.listen(source, phrase_time_limit=5)
+        except Exception as e:
+            self.add_message("Assistant", f"Microphone error: {e}")
+            return
+        try:
+            text = recognizer.recognize_google(audio)
+        except sr.UnknownValueError:
+            self.add_message("Assistant", "Could not understand audio.")
+            return
+        except sr.RequestError as e:
+            self.add_message("Assistant", f"Speech recognition error: {e}")
+            return
+        self.entry.delete(0, tk.END)
+        self.entry.insert(0, text)
+        self.send_message()
+
     def on_minimize(self, event):
         if self.root.state() == 'iconic':
             self.hide_window()
@@ -91,6 +147,7 @@ class ChatGUI:
         image = Image.new('RGB', (64, 64), color='black')
         menu = pystray.Menu(
             pystray.MenuItem('Open', self.show_window),
+            pystray.MenuItem('Settings', self.open_settings),
             pystray.MenuItem('Quit', self.quit_app)
         )
         self.tray = pystray.Icon('InsightMate', image, 'InsightMate', menu)
@@ -100,6 +157,37 @@ class ChatGUI:
         if self.tray:
             self.tray.stop()
             self.tray = None
+
+    def open_settings(self, icon=None, item=None):
+        win = tk.Toplevel(self.root)
+        win.title('Settings')
+        api_var = tk.StringVar(value=self.config.get('api_key', ''))
+        llm_var = tk.StringVar(value=self.config.get('llm', 'llama3'))
+        theme_var = tk.StringVar(value=self.config.get('theme', 'dark'))
+
+        tk.Label(win, text='OpenAI API Key:').grid(row=0, column=0, sticky='w')
+        api_entry = tk.Entry(win, textvariable=api_var, width=40)
+        api_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        tk.Label(win, text='LLM:').grid(row=1, column=0, sticky='w')
+        llm_box = ttk.Combobox(win, textvariable=llm_var,
+                               values=['gpt-4o', 'gpt-4', 'llama3'],
+                               state='readonly')
+        llm_box.grid(row=1, column=1, padx=5, pady=5)
+
+        tk.Label(win, text='Theme:').grid(row=2, column=0, sticky='w')
+        theme_box = ttk.Combobox(win, textvariable=theme_var, values=['dark', 'light'], state='readonly')
+        theme_box.grid(row=2, column=1, padx=5, pady=5)
+
+        def save():
+            self.config['api_key'] = api_var.get().strip()
+            self.config['llm'] = llm_var.get()
+            self.config['theme'] = theme_var.get()
+            save_config(self.config)
+            self.apply_theme()
+            win.destroy()
+
+        tk.Button(win, text='Save', command=save).grid(row=3, column=0, columnspan=2, pady=10)
 
     def quit_app(self, icon=None, item=None):
         self.on_close()
