@@ -1,6 +1,6 @@
 # InsightMate
 
-InsightMate is a macOS menu bar assistant that summarizes your recent iMessage, Gmail, Calendar and OneDrive activity using a local Python backend and GPT‑4. It also provides a small chat window for interactive questions.
+InsightMate is a desktop assistant that summarizes your recent iMessage, Gmail, Calendar and OneDrive activity using a local Python backend and GPT‑4. It also provides a small chat window for interactive questions. The Python scripts can also run on Windows together with an Electron front end.
 
 ## Project Layout
 
@@ -42,4 +42,8 @@ python main.py "What's new?"
 ```
 
 The Flask server listens on `http://localhost:5000` and `main.py` writes the assistant reply to `/tmp/insight_output.txt`.
+
+## OneDrive Local Access
+
+The `onedrive_reader.py` module automatically locates your OneDrive folder on Windows and indexes text, Markdown, Word and PDF documents. Queries about searching or listing files are routed to this reader and returned in the chat window.
 
