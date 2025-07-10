@@ -20,5 +20,7 @@ This repository contains the source for my personal site as well as **InsightMat
    background. Use the tray icon to restore or quit InsightMate.
 8. If the chat window shows connection errors, check
    `InsightMate/Scripts/chat_server.log` for details.
+9. Conversation history, unread email summaries and calendar events are stored
+   locally in `InsightMate/Scripts/memory.db`.
 
 See [InsightMate/README.md](InsightMate/README.md) for more details.

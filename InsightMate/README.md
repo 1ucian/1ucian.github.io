@@ -32,3 +32,7 @@ Minimizing the window hides it to the system tray so InsightMate can keep
 running in the background. Right‑click the tray icon to quit or open the
 chat window again.
 
+InsightMate keeps a local SQLite database named `memory.db` in the `Scripts`
+folder. It records your chat history as well as any emails or calendar events
+that were read during a session.
+

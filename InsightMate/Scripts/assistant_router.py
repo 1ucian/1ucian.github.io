@@ -9,6 +9,11 @@ from gmail_reader import fetch_unread_email
 from calendar_reader import list_today_events
 from reminder_scheduler import schedule as schedule_reminder
 from action_executor import execute as execute_action
+from memory_db import (
+    save_message,
+    save_email,
+    save_calendar_events,
+)
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
@@ -28,32 +33,43 @@ def gpt(prompt: str) -> str:
 
 
 def route(query: str) -> str:
+    save_message('user', query)
     q = query.lower()
+    reply = ''
     if any(k in q for k in EMAIL_KEYWORDS):
         email = fetch_unread_email()
+        save_email(email)
         if not email:
-            return 'No unread email.'
-        return f"From {email['from']}: {email['subject']} - {email['snippet']}"
-    if any(k in q for k in CALENDAR_KEYWORDS):
+            reply = 'No unread email.'
+        else:
+            reply = f"From {email['from']}: {email['subject']} - {email['snippet']}"
+    elif any(k in q for k in CALENDAR_KEYWORDS):
         events = list_today_events()
+        save_calendar_events(events)
         if not events:
-            return 'No calendar events today.'
-        lines = [f"{e['start']} {e['title']}" for e in events]
-        return '\n'.join(lines)
-    if any(k in q for k in ONEDRIVE_KEYWORDS):
+            reply = 'No calendar events today.'
+        else:
+            lines = [f"{e['start']} {e['title']}" for e in events]
+            reply = '\n'.join(lines)
+    elif any(k in q for k in ONEDRIVE_KEYWORDS):
         if 'list' in q and 'word' in q:
             docs = list_word_docs()
-            return 'Word docs:\n' + '\n'.join(docs)
-        results = search(query)
-        if not results:
-            return 'No matching documents found.'
-        lines = []
-        for r in results:
-            snippet = f" - {r['snippet']}" if r.get('snippet') else ''
-            lines.append(f"{r['name']}{snippet}")
-        return '\n'.join(lines)
-    if 'remind me' in q or q.startswith('remind'):
-        return schedule_reminder(query)
-    if 'open' in q or 'launch' in q or 'play' in q:
-        return execute_action(query)
-    return gpt(query)
+            reply = 'Word docs:\n' + '\n'.join(docs)
+        else:
+            results = search(query)
+            if not results:
+                reply = 'No matching documents found.'
+            else:
+                lines = []
+                for r in results:
+                    snippet = f" - {r['snippet']}" if r.get('snippet') else ''
+                    lines.append(f"{r['name']}{snippet}")
+                reply = '\n'.join(lines)
+    elif 'remind me' in q or q.startswith('remind'):
+        reply = schedule_reminder(query)
+    elif 'open' in q or 'launch' in q or 'play' in q:
+        reply = execute_action(query)
+    else:
+        reply = gpt(query)
+    save_message('assistant', reply)
+    return reply
