@@ -1,11 +1,2 @@
-# macOS
-.DS_Store
-build/
-DerivedData/
 
-# Python
-__pycache__/
-*.pyc
-
-# OAuth tokens
 Scripts/token.json

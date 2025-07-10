@@ -50,6 +50,7 @@ def index_files() -> List[Dict[str, str]]:
     return _def_cache
 
 
+
 def extract_text(path: str) -> str:
     """Best-effort plain text extraction."""
     ext = Path(path).suffix.lower()
@@ -95,3 +96,4 @@ def list_word_docs(limit: int = 20) -> List[str]:
 if __name__ == '__main__':
     for item in search('test'):
         print(f"{item['name']} - {item['path']}")
+
