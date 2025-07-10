@@ -6,11 +6,14 @@ import time
 import requests
 import tkinter as tk
 from tkinter.scrolledtext import ScrolledText
+from PIL import Image
+import pystray
 
 class ChatGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("InsightMate")
+        self.tray = None
 
         self.text_area = ScrolledText(root, state='disabled', width=60, height=20)
         self.text_area.pack(padx=10, pady=10)
@@ -21,6 +24,9 @@ class ChatGUI:
 
         self.server_proc = None
         self.start_server()
+
+        root.protocol("WM_DELETE_WINDOW", self.hide_window)
+        root.bind("<Unmap>", self.on_minimize)
 
     def start_server(self):
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -53,6 +59,33 @@ class ChatGUI:
         self.entry.delete(0, tk.END)
         threading.Thread(target=self.call_api, args=(text,)).start()
 
+    def on_minimize(self, event):
+        if self.root.state() == 'iconic':
+            self.hide_window()
+
+    def hide_window(self):
+        self.root.withdraw()
+        if not self.tray:
+            self.setup_tray()
+            threading.Thread(target=self.tray.run, daemon=True).start()
+
+    def setup_tray(self):
+        image = Image.new('RGB', (64, 64), color='black')
+        menu = pystray.Menu(
+            pystray.MenuItem('Open', self.show_window),
+            pystray.MenuItem('Quit', self.quit_app)
+        )
+        self.tray = pystray.Icon('InsightMate', image, 'InsightMate', menu)
+
+    def show_window(self, icon=None, item=None):
+        self.root.deiconify()
+        if self.tray:
+            self.tray.stop()
+            self.tray = None
+
+    def quit_app(self, icon=None, item=None):
+        self.on_close()
+
     def call_api(self, text):
         url = "http://localhost:5000/chat"
         try:
@@ -76,10 +109,11 @@ class ChatGUI:
             self.server_proc.terminate()
         if hasattr(self, 'log_file') and not self.log_file.closed:
             self.log_file.close()
+        if self.tray:
+            self.tray.stop()
         self.root.destroy()
 
 if __name__ == '__main__':
     root = tk.Tk()
     gui = ChatGUI(root)
-    root.protocol("WM_DELETE_WINDOW", gui.on_close)
     root.mainloop()

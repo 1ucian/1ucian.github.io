@@ -17,6 +17,18 @@ The GUI automatically starts the backend chat server and lets you send
 queries to it. If you see connection errors, the server may have failed to
 start. Check `Scripts/chat_server.log` for any errors.
 
-Copy `.env.example` to `.env` and fill in your `OPENAI_API_KEY` so the
-assistant can access GPT‑4.
+Copy `.env.example` to `.env`. Set `OPENAI_API_KEY` only if you want to use
+GPT‑4; leaving it blank will route chat requests to the local Llama 3 model via
+[Ollama](https://ollama.ai/).
+
+`windows_setup.ps1` will automatically download the Llama 3 model with
+`ollama pull llama3` as long as Ollama is installed.
+
+Place your Google API `credentials.json` in this directory and run
+`python gmail_reader.py` once to authorize Gmail and Calendar access. The
+resulting `token.json` is reused for future sessions.
+
+Minimizing the window hides it to the system tray so InsightMate can keep
+running in the background. Right‑click the tray icon to quit or open the
+chat window again.
 

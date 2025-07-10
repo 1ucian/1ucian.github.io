@@ -12,4 +12,6 @@ dateparser
 python-dotenv
 apscheduler
 pywin32
+pystray
+Pillow
 
