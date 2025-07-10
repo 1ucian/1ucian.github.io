@@ -39,14 +39,13 @@ def _iter_files() -> List[Dict[str, str]]:
     return files
 
 
-_def_cache: Optional[List[Dict[str, str]]] = None
+from functools import lru_cache
 
 
+@lru_cache(maxsize=1)
 def index_files() -> List[Dict[str, str]]:
-    global _def_cache
-    if _def_cache is None:
-        _def_cache = sorted(_iter_files(), key=lambda f: f['modified'], reverse=True)
-    return _def_cache
+    """Return cached list of OneDrive documents with metadata."""
+    return sorted(_iter_files(), key=lambda f: f['modified'], reverse=True)
 
 
 def extract_text(path: str) -> str:
