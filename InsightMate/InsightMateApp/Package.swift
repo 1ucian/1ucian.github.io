@@ -5,9 +5,6 @@ import PackageDescription
 
 let package = Package(
     name: "InsightMateApp",
-    platforms: [
-        .macOS(.v11)
-    ],
     targets: [
         .executableTarget(
             name: "InsightMateApp",
