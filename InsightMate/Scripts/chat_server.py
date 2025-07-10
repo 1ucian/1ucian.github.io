@@ -2,6 +2,7 @@ import os
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from assistant_router import route
+from reminder_scheduler import list_reminders, list_tasks
 
 app = Flask(__name__)
 
@@ -14,6 +15,20 @@ def chat():
     message = data.get('message') or data.get('query') or ''
     reply = route(message)
     return jsonify({'reply': reply})
+
+
+@app.route('/reminders', methods=['GET'])
+def reminders():
+    rems = list_reminders()
+    data = [{'id': r[0], 'text': r[1], 'time': r[2]} for r in rems]
+    return jsonify({'reminders': data})
+
+
+@app.route('/tasks', methods=['GET'])
+def tasks():
+    tasks = list_tasks()
+    data = [{'id': t[0], 'type': t[1], 'description': t[2], 'schedule': t[3]} for t in tasks]
+    return jsonify({'tasks': data})
 
 if __name__ == '__main__':
     app.run(port=5000)
