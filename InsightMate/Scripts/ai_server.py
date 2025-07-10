@@ -2,7 +2,7 @@ import os
 from flask import Flask, request, jsonify
 import openai
 from dotenv import load_dotenv
-from assistant_router import route_query
+from assistant_router import route
 
 app = Flask(__name__)
 
@@ -38,15 +38,7 @@ def process():
 def chat():
     data = request.get_json() or {}
     query = data.get('query', '')
-    routed = route_query(query)
-    if routed is not None:
-        return jsonify({'reply': routed})
-    # fallback to GPT-4
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": query}]
-    )
-    reply = response['choices'][0]['message']['content'].strip()
+    reply = route(query)
     return jsonify({'reply': reply})
 
 if __name__ == '__main__':
