@@ -3,6 +3,7 @@ import subprocess
 from typing import Optional
 import openai
 from dotenv import load_dotenv
+from config import load_config, get_api_key, get_llm
 
 from onedrive_reader import search, list_word_docs
 from gmail_reader import fetch_unread_email
@@ -24,7 +25,9 @@ from memory_db import (
 )
 
 load_dotenv()
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+
+def _get_config():
+    return load_config()
 
 ONEDRIVE_KEYWORDS = {'onedrive', 'search', 'summarize', 'find', 'list'}
 EMAIL_KEYWORDS = {'gmail', 'email', 'inbox', 'mail'}
@@ -32,11 +35,18 @@ CALENDAR_KEYWORDS = {'calendar', 'event', 'schedule'}
 
 
 def gpt(prompt: str) -> str:
-    if OPENAI_API_KEY:
-        openai.api_key = OPENAI_API_KEY
-        resp = openai.ChatCompletion.create(model='gpt-4', messages=[{"role": "user", "content": prompt}])
+    cfg = _get_config()
+    llm = get_llm(cfg).lower()
+    api_key = get_api_key(cfg)
+    if llm in {'gpt-4', 'gpt-4o'}:
+        if not api_key:
+            return 'OpenAI API key missing.'
+        openai.api_key = api_key
+        model = 'gpt-4o' if llm == 'gpt-4o' else 'gpt-4'
+        resp = openai.ChatCompletion.create(model=model, messages=[{"role": "user", "content": prompt}])
         return resp['choices'][0]['message']['content'].strip()
-    out = subprocess.check_output(['ollama', 'run', 'llama3', prompt])
+    model = llm if llm else 'llama3'
+    out = subprocess.check_output(['ollama', 'run', model, prompt])
     return out.decode().strip()
 
 
