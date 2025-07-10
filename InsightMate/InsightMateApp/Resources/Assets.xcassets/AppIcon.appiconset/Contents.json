@@ -2,7 +2,7 @@
   "images" : [
     {
       "filename" : "",
-      "idiom" : "mac",
+      "idiom" : "universal",
       "scale" : "1x",
       "size" : "512x512"
     }
