@@ -171,7 +171,7 @@ class ChatGUI:
 
         tk.Label(win, text='LLM:').grid(row=1, column=0, sticky='w')
         llm_box = ttk.Combobox(win, textvariable=llm_var,
-                               values=['gpt-4o', 'gpt-4', 'llama3'],
+                               values=['gpt-4o', 'gpt-4', 'o4-mini', 'o4-mini-high', 'llama3'],
                                state='readonly')
         llm_box.grid(row=1, column=1, padx=5, pady=5)
 
