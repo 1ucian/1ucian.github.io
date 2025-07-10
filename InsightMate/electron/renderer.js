@@ -11,7 +11,8 @@ const logFile = path.join(logPath, 'chatlog.txt');
 
 function addMessage(sender, text) {
   const div = document.createElement('div');
-  div.innerHTML = `<b>${sender}:</b> ` + marked.parse(text);
+  div.classList.add('message', sender === 'You' ? 'you' : 'assistant');
+  div.innerHTML = `<strong>${sender}:</strong> ` + marked.parse(text);
   messagesDiv.appendChild(div);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
   fs.appendFileSync(logFile, `${sender}: ${text}\n`);

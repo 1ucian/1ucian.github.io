@@ -13,13 +13,31 @@ class ChatGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("InsightMate")
+        self.root.geometry("500x600")
+        self.root.configure(bg="#2b2b2b")
         self.tray = None
 
-        self.text_area = ScrolledText(root, state='disabled', width=60, height=20)
-        self.text_area.pack(padx=10, pady=10)
+        self.text_area = ScrolledText(
+            root,
+            state="disabled",
+            width=60,
+            height=25,
+            bg="#1e1e1e",
+            fg="#ffffff",
+            insertbackground="#ffffff",
+            font=("Segoe UI", 10),
+        )
+        self.text_area.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
-        self.entry = tk.Entry(root, width=60)
-        self.entry.pack(padx=10, pady=(0, 10))
+        self.entry = tk.Entry(
+            root,
+            width=60,
+            bg="#2b2b2b",
+            fg="#ffffff",
+            insertbackground="#ffffff",
+            font=("Segoe UI", 10),
+        )
+        self.entry.pack(padx=10, pady=(0, 10), fill=tk.X)
         self.entry.bind("<Return>", self.send_message)
 
         self.server_proc = None
