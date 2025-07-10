@@ -25,11 +25,19 @@ class ChatGUI:
     def start_server(self):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         if self.server_proc is None:
+            log_path = os.path.join(script_dir, 'chat_server.log')
+            self.log_file = open(log_path, 'w')
             self.server_proc = subprocess.Popen(
                 [sys.executable, os.path.join(script_dir, 'chat_server.py')],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stdout=self.log_file,
+                stderr=subprocess.STDOUT
             )
+            time.sleep(0.5)
+            if self.server_proc.poll() is not None:
+                self.add_message(
+                    "Assistant",
+                    "Chat server failed to start. See chat_server.log for details."
+                )
 
     def add_message(self, sender, text):
         self.text_area.configure(state='normal')
@@ -66,6 +74,8 @@ class ChatGUI:
     def on_close(self):
         if self.server_proc:
             self.server_proc.terminate()
+        if hasattr(self, 'log_file') and not self.log_file.closed:
+            self.log_file.close()
         self.root.destroy()
 
 if __name__ == '__main__':
