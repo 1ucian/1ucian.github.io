@@ -1,6 +1,6 @@
 # 1ucian.me
 
-This repository contains the source for my personal site as well as **InsightMate**, a simple desktop assistant. InsightMate uses local Python scripts to read your Gmail, Calendar and OneDrive data and lets you chat with GPT‑4o, GPT‑4 or Ollama.
+This repository contains the source for my personal site as well as **InsightMate**, a simple desktop assistant. InsightMate uses local Python scripts to read your Gmail, Calendar and OneDrive data and lets you chat with GPT‑4o, GPT‑4 or Ollama. See [PRD.md](PRD.md) for product requirements and the feature roadmap.
 
 ## Running InsightMate on Windows
 
