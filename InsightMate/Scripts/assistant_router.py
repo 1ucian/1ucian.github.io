@@ -2,11 +2,13 @@ import os
 import subprocess
 from typing import Optional
 import openai
+from dotenv import load_dotenv
 
 from onedrive_reader import search, list_word_docs
 from reminder_scheduler import schedule as schedule_reminder
 from action_executor import execute as execute_action
 
+load_dotenv()
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 ONEDRIVE_KEYWORDS = {'onedrive', 'search', 'summarize', 'find', 'list'}

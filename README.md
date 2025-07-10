@@ -7,6 +7,6 @@ This repository contains the source for my personal site as well as **InsightMat
 1. Install Python 3.
 2. Open `InsightMate/Scripts` in a terminal.
 3. Run `windows_setup.ps1` to create a virtual environment and launch the backend server, or run `python windows_gui.py` to open the chat window directly.
-4. When prompted, enter your `OPENAI_API_KEY`.
+4. Set `OPENAI_API_KEY` in your environment or create a `.env` file with it.
 
 See [InsightMate/README.md](InsightMate/README.md) for more details.
