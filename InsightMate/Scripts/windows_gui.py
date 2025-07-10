@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import threading
+import time
 import requests
 import tkinter as tk
 from tkinter.scrolledtext import ScrolledText
@@ -45,9 +46,19 @@ class ChatGUI:
         threading.Thread(target=self.call_api, args=(text,)).start()
 
     def call_api(self, text):
+        url = "http://localhost:5000/chat"
         try:
-            res = requests.post("http://localhost:5000/chat", json={'query': text})
+            res = requests.post(url, json={'query': text})
+            res.raise_for_status()
             reply = res.json().get('reply', '')
+        except requests.exceptions.ConnectionError:
+            # server likely isn't running
+            self.start_server()
+            time.sleep(0.5)
+            reply = (
+                "Unable to reach InsightMate server. "
+                "Make sure dependencies from requirements.txt are installed."
+            )
         except Exception as e:
             reply = f"Error: {e}"
         self.root.after(0, self.add_message, "Assistant", reply)
