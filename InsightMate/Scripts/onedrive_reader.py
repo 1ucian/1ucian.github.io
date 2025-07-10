@@ -1,44 +1,97 @@
 import os
-import json
-import requests
-import msal
+from pathlib import Path
+from typing import List, Dict, Optional
 
-CLIENT_ID = os.getenv('MS_CLIENT_ID')
-TENANT_ID = os.getenv('MS_TENANT_ID', 'common')
-SCOPES = ['Files.Read']
-TOKEN_FILE = 'ms_token.json'
+try:
+    from docx import Document
+except Exception:
+    Document = None
 
-token_cache = msal.SerializableTokenCache()
-if os.path.exists(TOKEN_FILE):
-    token_cache.deserialize(open(TOKEN_FILE).read())
+try:
+    from PyPDF2 import PdfReader
+except Exception:
+    PdfReader = None
 
-app = msal.PublicClientApplication(
-    CLIENT_ID,
-    authority=f"https://login.microsoftonline.com/{TENANT_ID}",
-    token_cache=token_cache
-)
+try:
+    import textract
+except Exception:
+    textract = None
 
-def get_token():
-    accounts = app.get_accounts()
-    if accounts:
-        result = app.acquire_token_silent(SCOPES, account=accounts[0])
-    else:
-        flow = app.initiate_device_flow(scopes=SCOPES)
-        print(flow['message'])
-        result = app.acquire_token_by_device_flow(flow)
-    if 'access_token' in result:
-        with open(TOKEN_FILE, 'w') as f:
-            f.write(token_cache.serialize())
-        return result['access_token']
-    raise RuntimeError('Failed to acquire token')
+ONEDRIVE_DIR = os.path.join(os.path.expanduser('~'), 'OneDrive')
+DOC_EXTS = {'.txt', '.md', '.docx', '.pdf'}
 
-def list_recent_files(limit=5):
-    token = get_token()
-    headers = {'Authorization': f'Bearer {token}'}
-    url = 'https://graph.microsoft.com/v1.0/me/drive/recent'
-    resp = requests.get(url, headers=headers)
-    items = resp.json().get('value', [])[:limit]
-    return [{'name': i.get('name'), 'id': i.get('id')} for i in items]
+
+def _iter_files() -> List[Dict[str, str]]:
+    files = []
+    if not os.path.isdir(ONEDRIVE_DIR):
+        return files
+    for root, _dirs, filenames in os.walk(ONEDRIVE_DIR):
+        for name in filenames:
+            ext = Path(name).suffix.lower()
+            if ext in DOC_EXTS:
+                path = os.path.join(root, name)
+                info = {
+                    'name': name,
+                    'path': path,
+                    'modified': os.path.getmtime(path)
+                }
+                files.append(info)
+    return files
+
+
+_def_cache: Optional[List[Dict[str, str]]] = None
+
+
+def index_files() -> List[Dict[str, str]]:
+    """Return cached list of OneDrive documents with metadata."""
+    global _def_cache
+    if _def_cache is None:
+        _def_cache = sorted(_iter_files(), key=lambda f: f['modified'], reverse=True)
+    return _def_cache
+
+
+def extract_text(path: str) -> str:
+    """Best-effort plain text extraction."""
+    ext = Path(path).suffix.lower()
+    try:
+        if ext in {'.txt', '.md'}:
+            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                return f.read()
+        if ext == '.docx' and Document:
+            doc = Document(path)
+            return '\n'.join(p.text for p in doc.paragraphs)
+        if ext == '.pdf' and PdfReader:
+            reader = PdfReader(path)
+            return '\n'.join(page.extract_text() or '' for page in reader.pages)
+        if textract:
+            return textract.process(path).decode('utf-8', errors='ignore')
+    except Exception:
+        pass
+    return ''
+
+
+def search(query: str, limit: int = 5) -> List[Dict[str, str]]:
+    """Search filenames and content for the query."""
+    results = []
+    q = query.lower()
+    for info in index_files():
+        if q in info['name'].lower():
+            results.append({**info, 'snippet': ''})
+        else:
+            text = extract_text(info['path']).lower()
+            if q in text:
+                snippet_start = max(text.find(q) - 40, 0)
+                snippet = text[snippet_start: snippet_start + 160]
+                results.append({**info, 'snippet': snippet})
+        if len(results) >= limit:
+            break
+    return results
+
+
+def list_word_docs(limit: int = 20) -> List[str]:
+    return [f['name'] for f in index_files() if f['name'].lower().endswith('.docx')][:limit]
+
 
 if __name__ == '__main__':
-    print(list_recent_files())
+    for item in search('test'):
+        print(f"{item['name']} - {item['path']}")
