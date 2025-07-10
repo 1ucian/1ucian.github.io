@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from assistant_router import route
 from reminder_scheduler import list_reminders, list_tasks
+from memory_db import get_recent_messages
 
 app = Flask(__name__)
 
@@ -29,6 +30,16 @@ def tasks():
     tasks = list_tasks()
     data = [{'id': t[0], 'type': t[1], 'description': t[2], 'schedule': t[3]} for t in tasks]
     return jsonify({'tasks': data})
+
+
+@app.route('/memory', methods=['GET'])
+def memory():
+    messages = get_recent_messages()
+    data = [
+        {'ts': m[0], 'sender': m[1], 'text': m[2]}
+        for m in messages
+    ]
+    return jsonify({'messages': data})
 
 if __name__ == '__main__':
     app.run(port=5000)

@@ -20,7 +20,8 @@ This repository contains the source for my personal site as well as **InsightMat
 7. Minimizing the chat window hides it to the system tray so it can run in the
    background. Use the tray icon to restore or quit InsightMate.
 8. Open the **Settings** window (via the tray menu or button) to update your API
-   key, choose between GPT‑4o, GPT‑4 or Llama 3, and switch themes.
+   key, choose between GPT‑4o, GPT‑4, **o4-mini**, **o4-mini-high** or Llama 3,
+   and switch themes.
 9. Use the **Voice** button to dictate a query if `speech_recognition` and
    `pyaudio` are installed.
 10. If the chat window shows connection errors, check
@@ -28,5 +29,7 @@ This repository contains the source for my personal site as well as **InsightMat
 11. Conversation history, unread email summaries and calendar events are stored
     locally in `InsightMate/Scripts/memory.db`. Settings are written to
     `InsightMate/Scripts/config.json`.
+12. The Electron UI now shows **Reminders**, **Tasks** and a **Memory** panel so
+    you can review scheduled jobs and recent conversations.
 
 See [InsightMate/README.md](InsightMate/README.md) for more details.

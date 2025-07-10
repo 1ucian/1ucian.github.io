@@ -18,7 +18,7 @@ queries to it. If you see connection errors, the server may have failed to
 start. Check `Scripts/chat_server.log` for any errors.
 
 Copy `.env.example` to `.env`. Set `OPENAI_API_KEY` only if you want to use
-GPT‑4o or GPT‑4; leaving it blank will route chat requests to the local Llama 3 model via
+GPT‑4o, GPT‑4, **o4-mini** or **o4-mini-high**; leaving it blank will route chat requests to the local Llama 3 model via
 [Ollama](https://ollama.ai/).
 
 `windows_setup.ps1` will automatically download the Llama 3 model with
@@ -38,4 +38,6 @@ and `pyaudio`, you can dictate commands instead of typing them.
 InsightMate keeps a local SQLite database named `memory.db` in the `Scripts`
 folder. It records your chat history as well as any emails or calendar events
 that were read during a session.
+The desktop UI now includes a **Memory** column to view recent messages along
+with sections for reminders and scheduled tasks.
 

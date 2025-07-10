@@ -7,6 +7,7 @@ const input = document.getElementById('input');
 const messagesDiv = document.getElementById('messages');
 const reminderDiv = document.getElementById('reminder-list');
 const taskDiv = document.getElementById('task-list');
+const memoryDiv = document.getElementById('memory-list');
 const logPath = path.join(require('os').homedir(), 'InsightMate', 'logs');
 if (!fs.existsSync(logPath)) fs.mkdirSync(logPath, { recursive: true });
 const logFile = path.join(logPath, 'chatlog.txt');
@@ -40,6 +41,16 @@ function renderTasks(items) {
   });
 }
 
+function renderMemory(items) {
+  memoryDiv.innerHTML = '';
+  items.forEach(m => {
+    const d = document.createElement('div');
+    d.className = 'reminder-item';
+    d.textContent = `${m.sender}: ${m.text}`;
+    memoryDiv.appendChild(d);
+  });
+}
+
 function fetchReminders() {
   fetch('http://localhost:5000/reminders')
     .then(res => res.json())
@@ -49,6 +60,11 @@ function fetchReminders() {
   fetch('http://localhost:5000/tasks')
     .then(res => res.json())
     .then(data => renderTasks(data.tasks || []))
+    .catch(() => {});
+
+  fetch('http://localhost:5000/memory')
+    .then(res => res.json())
+    .then(data => renderMemory(data.messages || []))
     .catch(() => {});
 }
 

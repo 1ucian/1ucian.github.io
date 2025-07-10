@@ -22,6 +22,7 @@ from memory_db import (
     save_message,
     save_email,
     save_calendar_events,
+    get_recent_messages,
 )
 
 load_dotenv()
@@ -38,11 +39,16 @@ def gpt(prompt: str) -> str:
     cfg = _get_config()
     llm = get_llm(cfg).lower()
     api_key = get_api_key(cfg)
-    if llm in {'gpt-4', 'gpt-4o'}:
+    if llm in {'gpt-4', 'gpt-4o', 'o4-mini', 'o4-mini-high'}:
         if not api_key:
             return 'OpenAI API key missing.'
         openai.api_key = api_key
-        model = 'gpt-4o' if llm == 'gpt-4o' else 'gpt-4'
+        if llm == 'gpt-4o':
+            model = 'gpt-4o'
+        elif llm == 'gpt-4':
+            model = 'gpt-4'
+        else:
+            model = llm
         resp = openai.ChatCompletion.create(model=model, messages=[{"role": "user", "content": prompt}])
         return resp['choices'][0]['message']['content'].strip()
     model = llm if llm else 'llama3'
@@ -132,6 +138,13 @@ def route(query: str) -> str:
             reply = 'No tasks scheduled.'
         else:
             lines = [f"{t[3]} - {t[1]}" for t in tasks]
+            reply = '\n'.join(lines)
+    elif 'show memory' in q or 'view memory' in q or 'show history' in q:
+        mem = get_recent_messages()
+        if not mem:
+            reply = 'No memory.'
+        else:
+            lines = [f"{m[0]} {m[1]}: {m[2]}" for m in mem]
             reply = '\n'.join(lines)
     elif 'open' in q or 'launch' in q or 'play' in q:
         reply = execute_action(query)
