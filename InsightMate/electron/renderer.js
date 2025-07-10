@@ -5,6 +5,8 @@ const marked = require('marked');
 
 const input = document.getElementById('input');
 const messagesDiv = document.getElementById('messages');
+const reminderDiv = document.getElementById('reminder-list');
+const taskDiv = document.getElementById('task-list');
 const logPath = path.join(require('os').homedir(), 'InsightMate', 'logs');
 if (!fs.existsSync(logPath)) fs.mkdirSync(logPath, { recursive: true });
 const logFile = path.join(logPath, 'chatlog.txt');
@@ -16,6 +18,38 @@ function addMessage(sender, text) {
   messagesDiv.appendChild(div);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
   fs.appendFileSync(logFile, `${sender}: ${text}\n`);
+}
+
+function renderReminders(items) {
+  reminderDiv.innerHTML = '';
+  items.forEach(r => {
+    const d = document.createElement('div');
+    d.className = 'reminder-item';
+    d.textContent = `${r.time} - ${r.text}`;
+    reminderDiv.appendChild(d);
+  });
+}
+
+function renderTasks(items) {
+  taskDiv.innerHTML = '';
+  items.forEach(t => {
+    const d = document.createElement('div');
+    d.className = 'reminder-item';
+    d.textContent = `${t.schedule} - ${t.description}`;
+    taskDiv.appendChild(d);
+  });
+}
+
+function fetchReminders() {
+  fetch('http://localhost:5000/reminders')
+    .then(res => res.json())
+    .then(data => renderReminders(data.reminders || []))
+    .catch(() => {});
+
+  fetch('http://localhost:5000/tasks')
+    .then(res => res.json())
+    .then(data => renderTasks(data.tasks || []))
+    .catch(() => {});
 }
 
 document.addEventListener('keydown', (e) => {
@@ -42,5 +76,8 @@ function sendMessage() {
   })
     .then(res => res.json())
     .then(data => addMessage('Assistant', data.reply))
-    .catch(err => addMessage('Error', err.toString()));
+    .catch(err => addMessage('Error', err.toString()))
+    .finally(fetchReminders);
 }
+
+fetchReminders();

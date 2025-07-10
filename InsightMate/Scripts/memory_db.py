@@ -38,6 +38,23 @@ def init_db():
         'end TEXT'
         ')'
     )
+    c.execute(
+        'CREATE TABLE IF NOT EXISTS reminders ('
+        'id INTEGER PRIMARY KEY AUTOINCREMENT,'
+        'ts DATETIME DEFAULT CURRENT_TIMESTAMP,'
+        'text TEXT,'
+        'run_time TEXT'
+        ')'
+    )
+    c.execute(
+        'CREATE TABLE IF NOT EXISTS tasks ('
+        'id INTEGER PRIMARY KEY AUTOINCREMENT,'
+        'ts DATETIME DEFAULT CURRENT_TIMESTAMP,'
+        'type TEXT,'
+        'description TEXT,'
+        'schedule TEXT'
+        ')'
+    )
     conn.commit()
     conn.close()
 
@@ -81,6 +98,41 @@ def get_recent_messages(limit: int = 20) -> List[Tuple[str, str, str]]:
     conn = _connect()
     c = conn.cursor()
     c.execute('SELECT ts, sender, text FROM messages ORDER BY id DESC LIMIT ?', (limit,))
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+
+def save_reminder(text: str, run_time: str) -> None:
+    conn = _connect()
+    conn.execute('INSERT INTO reminders(text, run_time) VALUES (?, ?)', (text, run_time))
+    conn.commit()
+    conn.close()
+
+
+def list_reminders() -> List[Tuple[int, str, str]]:
+    conn = _connect()
+    c = conn.cursor()
+    c.execute('SELECT id, text, run_time FROM reminders ORDER BY run_time')
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+
+def save_task(task_type: str, description: str, schedule: str) -> None:
+    conn = _connect()
+    conn.execute(
+        'INSERT INTO tasks(type, description, schedule) VALUES (?, ?, ?)',
+        (task_type, description, schedule)
+    )
+    conn.commit()
+    conn.close()
+
+
+def list_tasks() -> List[Tuple[int, str, str, str]]:
+    conn = _connect()
+    c = conn.cursor()
+    c.execute('SELECT id, type, description, schedule FROM tasks ORDER BY id')
     rows = c.fetchall()
     conn.close()
     return rows

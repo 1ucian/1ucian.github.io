@@ -9,9 +9,16 @@
     font-family: 'Segoe UI', Tahoma, sans-serif;
     background: #1e1e1e;
     color: #ddd;
+    height: 100vh;
+  }
+  #container {
+    display: flex;
+    height: 100vh;
+  }
+  #chat {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    height: 100vh;
   }
   #messages {
     display: flex;
@@ -19,6 +26,22 @@
     flex: 1;
     overflow-y: auto;
     padding: 10px;
+  }
+  #reminders {
+    width: 200px;
+    padding: 10px;
+    overflow-y: auto;
+    background: #2b2b2b;
+  }
+  #tasks {
+    width: 200px;
+    padding: 10px;
+    overflow-y: auto;
+    background: #2b2b2b;
+  }
+  .reminder-item {
+    font-size: 12px;
+    margin-bottom: 8px;
   }
   textarea {
     border: none;
@@ -49,8 +72,20 @@
 </style>
 </head>
 <body>
-<div id="messages"></div>
-<textarea id="input" rows="3" placeholder="Type a message..."></textarea>
+<div id="container">
+  <div id="chat">
+    <div id="messages"></div>
+    <textarea id="input" rows="3" placeholder="Type a message..."></textarea>
+  </div>
+  <div id="reminders">
+    <h3>Reminders</h3>
+    <div id="reminder-list"></div>
+  </div>
+  <div id="tasks">
+    <h3>Tasks</h3>
+    <div id="task-list"></div>
+  </div>
+</div>
 <script src="renderer.js"></script>
 </body>
 </html>

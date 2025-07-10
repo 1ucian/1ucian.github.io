@@ -7,7 +7,15 @@ from dotenv import load_dotenv
 from onedrive_reader import search, list_word_docs
 from gmail_reader import fetch_unread_email
 from calendar_reader import list_today_events
-from reminder_scheduler import schedule as schedule_reminder
+from reminder_scheduler import (
+    schedule as schedule_reminder,
+    schedule_air_quality,
+    schedule_weather,
+    schedule_email,
+    schedule_calendar,
+    list_reminders,
+    list_tasks,
+)
 from action_executor import execute as execute_action
 from memory_db import (
     save_message,
@@ -30,6 +38,20 @@ def gpt(prompt: str) -> str:
         return resp['choices'][0]['message']['content'].strip()
     out = subprocess.check_output(['ollama', 'run', 'llama3', prompt])
     return out.decode().strip()
+
+
+def _extract_minutes(text: str) -> Optional[int]:
+    import re
+    match = re.search(r'(\d+)\s*(minute|hour)', text)
+    if match:
+        value = int(match.group(1))
+        unit = match.group(2)
+        return value * 60 if unit.startswith('hour') else value
+    if 'hour' in text:
+        return 60
+    if 'day' in text:
+        return 60 * 24
+    return None
 
 
 def route(query: str) -> str:
@@ -67,6 +89,40 @@ def route(query: str) -> str:
                 reply = '\n'.join(lines)
     elif 'remind me' in q or q.startswith('remind'):
         reply = schedule_reminder(query)
+    elif 'air quality' in q:
+        reply = schedule_air_quality(query)
+    elif 'schedule weather' in q or 'weather every' in q:
+        mins = _extract_minutes(q)
+        if mins:
+            reply = schedule_weather(mins)
+        else:
+            reply = 'Could not parse interval.'
+    elif 'schedule email' in q or 'email every' in q:
+        mins = _extract_minutes(q)
+        if mins:
+            reply = schedule_email(mins)
+        else:
+            reply = 'Could not parse interval.'
+    elif 'schedule calendar' in q or 'calendar every' in q:
+        mins = _extract_minutes(q)
+        if mins:
+            reply = schedule_calendar(mins)
+        else:
+            reply = 'Could not parse interval.'
+    elif 'list reminders' in q or 'show reminders' in q:
+        rems = list_reminders()
+        if not rems:
+            reply = 'No reminders set.'
+        else:
+            lines = [f"{r[2]} - {r[1]}" for r in rems]
+            reply = '\n'.join(lines)
+    elif 'list tasks' in q or 'show tasks' in q:
+        tasks = list_tasks()
+        if not tasks:
+            reply = 'No tasks scheduled.'
+        else:
+            lines = [f"{t[3]} - {t[1]}" for t in tasks]
+            reply = '\n'.join(lines)
     elif 'open' in q or 'launch' in q or 'play' in q:
         reply = execute_action(query)
     else:
