@@ -28,6 +28,7 @@ InsightMate is a cross-platform personal assistant bundled within this repositor
 - Ship prebuilt installers for Windows (via Tkinter + Electron) and macOS (Swift app).
 - Improve onboarding with a guided setup for API keys and Google credentials.
 - Add a unified settings panel to switch LLMs, themes and notification preferences across all UI variants.
+- The Electron chat window now includes this panel behind a **Settings** button so users can quickly change models or themes.
 
 ### Phase 2 – Expanded Integrations
 - Introduce additional data connectors (e.g. Slack or Discord message summaries, local file indexing beyond OneDrive).

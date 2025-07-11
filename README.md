@@ -19,9 +19,10 @@ This repository contains the source for my personal site as well as **InsightMat
    GPU is used automatically when present.
 7. Minimizing the chat window hides it to the system tray so it can run in the
    background. Use the tray icon to restore or quit InsightMate.
-8. Open the **Settings** window (via the tray menu or button) to update your API
-   key, choose between GPT‑4o, GPT‑4, **o4-mini**, **o4-mini-high** or Llama 3,
-   and switch themes.
+8. Open the **Settings** window (via the tray menu or the new button at the top
+   of the chat window) to update your API key, choose between GPT‑4o, GPT‑4,
+   **o4-mini**, **o4-mini-high** or Llama 3, and toggle between light and dark
+   themes. Your last selections are remembered for the next run.
 9. Use the **Voice** button to dictate a query if `speech_recognition` and
    `pyaudio` are installed.
 10. If the chat window shows connection errors, check
