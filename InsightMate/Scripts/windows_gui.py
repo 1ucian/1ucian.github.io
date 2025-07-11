@@ -81,14 +81,20 @@ class ChatGUI:
             area_fg = '#000000'
             entry_bg = '#ffffff'
             entry_fg = '#000000'
+            user_color = '#003366'
+            assistant_color = '#006600'
         else:
             bg_root = '#2b2b2b'
             area_bg = '#1e1e1e'
             area_fg = '#ffffff'
             entry_bg = '#2b2b2b'
             entry_fg = '#ffffff'
+            user_color = '#89b4fa'
+            assistant_color = '#f9e2af'
         self.root.configure(bg=bg_root)
         self.text_area.configure(bg=area_bg, fg=area_fg, insertbackground=area_fg)
+        self.text_area.tag_config('user', foreground=user_color)
+        self.text_area.tag_config('assistant', foreground=assistant_color)
         self.entry.configure(bg=entry_bg, fg=entry_fg, insertbackground=entry_fg)
         if hasattr(self, 'btn_frame'):
             self.btn_frame.configure(bg=bg_root)
@@ -111,8 +117,9 @@ class ChatGUI:
                 )
 
     def add_message(self, sender, text):
+        tag = 'user' if sender == 'You' else 'assistant'
         self.text_area.configure(state='normal')
-        self.text_area.insert(tk.END, f"{sender}: {text}\n")
+        self.text_area.insert(tk.END, f"{sender}: {text}\n", tag)
         self.text_area.configure(state='disabled')
         self.text_area.see(tk.END)
 
