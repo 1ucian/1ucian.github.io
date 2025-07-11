@@ -205,15 +205,22 @@ class ChatGUI:
         theme_box = ttk.Combobox(win, textvariable=theme_var, values=['dark', 'light'], state='readonly')
         theme_box.grid(row=2, column=1, padx=5, pady=5)
 
+        prompt_val = self.config.get('prompt', '')
+        tk.Label(win, text='System Prompt:').grid(row=3, column=0, sticky='nw')
+        prompt_entry = ScrolledText(win, width=40, height=10)
+        prompt_entry.insert('1.0', prompt_val)
+        prompt_entry.grid(row=3, column=1, padx=5, pady=5)
+
         def save():
             self.config['api_key'] = api_var.get().strip()
             self.config['llm'] = llm_var.get()
             self.config['theme'] = theme_var.get()
+            self.config['prompt'] = prompt_entry.get('1.0', tk.END).strip()
             save_config(self.config)
             self.apply_theme()
             win.destroy()
 
-        tk.Button(win, text='Save', command=save).grid(row=3, column=0, columnspan=2, pady=10)
+        tk.Button(win, text='Save', command=save).grid(row=4, column=0, columnspan=2, pady=10)
 
     def quit_app(self, icon=None, item=None):
         self.on_close()

@@ -3,7 +3,7 @@ import subprocess
 from typing import Optional
 import openai
 from dotenv import load_dotenv
-from config import load_config, get_api_key, get_llm
+from config import load_config, get_api_key, get_llm, get_prompt
 
 from onedrive_reader import search, list_word_docs
 from gmail_reader import fetch_unread_email
@@ -48,8 +48,10 @@ def gpt(prompt: str) -> str:
     cfg = _get_config()
     llm = get_llm(cfg).lower()
     api_key = get_api_key(cfg)
+    system_prompt = get_prompt(cfg)
     history = get_recent_messages(10)
-    messages = [{"role": m[1], "content": m[2]} for m in history]
+    messages = [{"role": "system", "content": system_prompt}]
+    messages += [{"role": m[1], "content": m[2]} for m in history]
     messages.append({"role": "user", "content": prompt})
     if llm in {"gpt-4", "gpt-4o", "o4-mini", "o4-mini-high"}:
         if not api_key:
