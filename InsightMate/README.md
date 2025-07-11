@@ -40,6 +40,8 @@ and `pyaudio`, you can dictate commands instead of typing them.
 InsightMate keeps a local SQLite database named `memory.db` in the `Scripts`
 folder. It records your chat history as well as any emails or calendar events
 that were read during a session.
-The desktop UI now includes a **Memory** column to view recent messages along
-with sections for reminders and scheduled tasks.
+The last few exchanges are also sent back to your chosen model so it can
+respond with awareness of previous messages. The desktop UI includes a
+**Memory** column to review recent messages along with sections for reminders
+and scheduled tasks.
 

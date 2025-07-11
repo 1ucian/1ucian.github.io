@@ -48,19 +48,25 @@ def gpt(prompt: str) -> str:
     cfg = _get_config()
     llm = get_llm(cfg).lower()
     api_key = get_api_key(cfg)
-    if llm in {'gpt-4', 'gpt-4o', 'o4-mini', 'o4-mini-high'}:
+    history = get_recent_messages(10)
+    messages = [{"role": m[1], "content": m[2]} for m in history]
+    messages.append({"role": "user", "content": prompt})
+    if llm in {"gpt-4", "gpt-4o", "o4-mini", "o4-mini-high"}:
         if not api_key:
-            return 'OpenAI API key missing.'
+            return "OpenAI API key missing."
         openai.api_key = api_key
-        if llm == 'gpt-4o':
-            model = 'gpt-4o'
-        elif llm == 'gpt-4':
-            model = 'gpt-4'
+        if llm == "gpt-4o":
+            model = "gpt-4o"
+        elif llm == "gpt-4":
+            model = "gpt-4"
         else:
             model = llm
-        return chat_completion(model, [{"role": "user", "content": prompt}])
-    model = llm if llm else 'llama3'
-    out = subprocess.check_output(['ollama', 'run', model, prompt])
+        return chat_completion(model, messages)
+    model = llm if llm else "llama3"
+    text = "\n".join(
+        f"{m['role'].capitalize()}: {m['content']}" for m in messages
+    )
+    out = subprocess.check_output(["ollama", "run", model, text])
     return out.decode().strip()
 
 

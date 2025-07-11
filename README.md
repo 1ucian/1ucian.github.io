@@ -16,8 +16,9 @@ This repository contains the source for my personal site as well as **InsightMat
 10. Use the **Voice** button to dictate a query if `speech_recognition` and `pyaudio` are installed.
 11. If the chat window shows connection errors, check `InsightMate/Scripts/chat_server.log` for details.
 12. Conversation history, unread email summaries and calendar events are stored locally in `InsightMate/Scripts/memory.db`. Settings are written to `InsightMate/Scripts/config.json`.
-13. To launch the Electron interface manually after the chat server is running, change to `InsightMate/electron` and run `npm start`. `setup.bat` performs this automatically when you run it.
-14. The Electron UI now shows **Reminders**, **Tasks** and a **Memory** panel so you can review scheduled jobs and recent conversations.
+13. The last few messages are sent to GPT‑4o, GPT‑4 or Llama 3 so chats keep their context across runs.
+14. To launch the Electron interface manually after the chat server is running, change to `InsightMate/electron` and run `npm start`. `setup.bat` performs this automatically when you run it.
+15. The Electron UI now shows **Reminders**, **Tasks** and a **Memory** panel so you can review scheduled jobs and recent conversations.
 
 See [InsightMate/README.md](InsightMate/README.md) for more details.
 
