@@ -9,13 +9,23 @@ try:
     from tkinter import ttk
     from tkinter.scrolledtext import ScrolledText
     from PIL import Image
-    import pystray
 except ImportError as e:
-    print(f"Missing dependency: {e.name}.\n"
-          "Run 'pip install -r requirements.txt' or execute 'windows_setup.ps1' "
-          "to install prerequisites.")
+    print(
+        f"Missing dependency: {e.name}.\n"
+        "Run 'pip install -r requirements.txt' or execute 'windows_setup.ps1'"
+        " to install prerequisites."
+    )
     time.sleep(5)
     sys.exit(1)
+
+try:
+    import pystray
+    HAVE_TRAY = True
+except ImportError:
+    HAVE_TRAY = False
+    print(
+        "pystray not installed – the system tray icon will be disabled."
+    )
 from config import load_config, save_config
 
 class ChatGUI:
@@ -146,11 +156,13 @@ class ChatGUI:
 
     def hide_window(self):
         self.root.withdraw()
-        if not self.tray:
+        if HAVE_TRAY and not self.tray:
             self.setup_tray()
             threading.Thread(target=self.tray.run, daemon=True).start()
 
     def setup_tray(self):
+        if not HAVE_TRAY:
+            return
         image = Image.new('RGB', (64, 64), color='black')
         menu = pystray.Menu(
             pystray.MenuItem('Open', self.show_window),
@@ -161,7 +173,7 @@ class ChatGUI:
 
     def show_window(self, icon=None, item=None):
         self.root.deiconify()
-        if self.tray:
+        if HAVE_TRAY and self.tray:
             self.tray.stop()
             self.tray = None
 
@@ -222,7 +234,7 @@ class ChatGUI:
             self.server_proc.terminate()
         if hasattr(self, 'log_file') and not self.log_file.closed:
             self.log_file.close()
-        if self.tray:
+        if HAVE_TRAY and self.tray:
             self.tray.stop()
         self.root.destroy()
 
