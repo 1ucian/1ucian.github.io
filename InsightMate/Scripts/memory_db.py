@@ -2,7 +2,7 @@ import os
 import sqlite3
 from typing import List, Tuple, Dict
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'memory.db')
+DB_PATH = os.path.join(os.path.dirname(__file__), "memory.db")
 
 
 def _connect():
@@ -10,15 +10,18 @@ def _connect():
 
 
 def init_db():
-    conn = _connect()
+    """Initialize the SQLite database if it doesn't already exist."""
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute(
-        'CREATE TABLE IF NOT EXISTS messages ('
-        'id INTEGER PRIMARY KEY AUTOINCREMENT,'
-        'ts DATETIME DEFAULT CURRENT_TIMESTAMP,'
-        'user TEXT,'
-        'assistant TEXT'
-        ')'
+        """
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user TEXT NOT NULL,
+            assistant TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        """
     )
     c.execute(
         'CREATE TABLE IF NOT EXISTS emails ('
@@ -57,9 +60,6 @@ def init_db():
     )
     conn.commit()
     conn.close()
-
-
-init_db()
 
 
 def save_message(user_input: str, ai_reply: str, limit: int = 100) -> None:
