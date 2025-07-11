@@ -5,7 +5,9 @@ from assistant_router import route
 from reminder_scheduler import list_reminders, list_tasks
 from memory_db import get_recent_messages
 
-app = Flask(__name__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, '../web')
+app = Flask(__name__, static_folder=STATIC_DIR, static_url_path='')
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
@@ -41,5 +43,10 @@ def memory():
     ]
     return jsonify({'messages': data})
 
+
+@app.route('/')
+def index():
+    return app.send_static_file('index.html')
+
 if __name__ == '__main__':
-    app.run(port=5000)
+    app.run(host='0.0.0.0', port=5000)
