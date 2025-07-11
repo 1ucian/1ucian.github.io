@@ -8,6 +8,9 @@ const messagesDiv = document.getElementById('messages');
 const reminderDiv = document.getElementById('reminder-list');
 const taskDiv = document.getElementById('task-list');
 const memoryDiv = document.getElementById('memory-list');
+const reminderToggle = document.getElementById('reminder-toggle');
+const taskToggle = document.getElementById('task-toggle');
+const memoryToggle = document.getElementById('memory-toggle');
 const settingsBtn = document.getElementById('settings-btn');
 const settingsModal = document.getElementById('settings-modal');
 const themeSelect = document.getElementById('theme-select');
@@ -16,13 +19,34 @@ const logPath = path.join(require('os').homedir(), 'InsightMate', 'logs');
 if (!fs.existsSync(logPath)) fs.mkdirSync(logPath, { recursive: true });
 const logFile = path.join(logPath, 'chatlog.txt');
 
-function addMessage(sender, text) {
+function addMessage(sender, text, typing = false) {
   const div = document.createElement('div');
   div.classList.add('message', sender === 'You' ? 'you' : 'assistant');
-  div.innerHTML = `<strong>${sender}:</strong> ` + marked.parse(text);
+  const span = document.createElement('span');
+  div.innerHTML = `<strong>${sender}:</strong> `;
+  div.appendChild(span);
   messagesDiv.appendChild(div);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  fs.appendFileSync(logFile, `${sender}: ${text}\n`);
+  const logIt = () => fs.appendFileSync(logFile, `${sender}: ${text}\n`);
+  if (typing) {
+    let i = 0;
+    const type = () => {
+      if (i < text.length) {
+        span.textContent += text[i];
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        i++;
+        setTimeout(type, 20);
+      } else {
+        span.innerHTML = marked.parse(text);
+        logIt();
+      }
+    };
+    type();
+  } else {
+    span.innerHTML = marked.parse(text);
+    logIt();
+  }
+  return div;
 }
 
 function renderReminders(items) {
@@ -58,6 +82,16 @@ function renderMemory(items) {
 function applyTheme(theme) {
   document.body.classList.toggle('light', theme === 'light');
 }
+
+reminderToggle.addEventListener('click', () => {
+  reminderDiv.classList.toggle('d-none');
+});
+taskToggle.addEventListener('click', () => {
+  taskDiv.classList.toggle('d-none');
+});
+memoryToggle.addEventListener('click', () => {
+  memoryDiv.classList.toggle('d-none');
+});
 
 function loadSettings() {
   const theme = localStorage.getItem('theme') || 'dark';
@@ -112,14 +146,21 @@ function sendMessage() {
   if (!text) return;
   addMessage('You', text);
   input.value = '';
+  const placeholder = addMessage('Assistant', '...', false);
   fetch('http://localhost:5000/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query: text, model: localStorage.getItem('model') || 'gpt-4o' })
   })
     .then(res => res.json())
-    .then(data => addMessage('Assistant', data.reply))
-    .catch(err => addMessage('Error', err.toString()))
+    .then(data => {
+      messagesDiv.removeChild(placeholder);
+      addMessage('Assistant', data.reply, true);
+    })
+    .catch(err => {
+      messagesDiv.removeChild(placeholder);
+      addMessage('Error', err.toString());
+    })
     .finally(fetchReminders);
 }
 
