@@ -6,7 +6,9 @@ Run the simple chat interface on Windows using Python and Tkinter. Install
 the required packages first using `pip install -r requirements.txt` (or run
 `windows_setup.ps1` which creates a virtual environment and installs the
 dependencies for you). This requirements file now includes `apscheduler` and
-`pywin32`, so make sure it completes successfully:
+`pywin32`, so make sure it completes successfully. If `pip` refuses to install
+`textract` you may be using a newer `pip` release – downgrade with
+`python -m pip install pip==23.3` or install `textract==1.6.3` manually:
 
 ```powershell
 cd Scripts
