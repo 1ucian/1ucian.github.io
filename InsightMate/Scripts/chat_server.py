@@ -1,4 +1,4 @@
-"""Minimal Flask server for the InsightMate Electron app."""
+"""Minimal Flask server for the InsightMate web app."""
 
 import os
 
@@ -20,5 +20,5 @@ register_common(app)
 
 
 if __name__ == "__main__":
-    # Listen on all interfaces so the Electron client can connect locally.
+    # Listen on all interfaces so the web client can connect locally.
     app.run(host="0.0.0.0", port=5000)
