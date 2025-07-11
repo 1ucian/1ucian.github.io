@@ -23,6 +23,9 @@ This repository contains the source for my personal site as well as **InsightMat
 17. Use `add event <title> <time>` to create a new calendar entry.
 18. Use `send email <address> <subject> <message>` to compose and send a Gmail message.
 
+Calendar events are scheduled in **Pacific Time** regardless of the host system's
+timezone.
+
 See [InsightMate/README.md](InsightMate/README.md) for more details.
 
 ## MCP Integration
