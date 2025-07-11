@@ -1,17 +1,20 @@
 import datetime
+from zoneinfo import ZoneInfo
 from googleapiclient.discovery import build
 
 from google_auth import get_credentials
 from dateparser.search import search_dates
+
+# Use Pacific time for all calendar operations
+PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
 
 
 def list_events_for_day(offset_days: int) -> list[dict]:
     """Return calendar events for today plus ``offset_days`` days."""
     creds = get_credentials()
     service = build('calendar', 'v3', credentials=creds)
-    tz = datetime.datetime.now().astimezone().tzinfo
     start = (
-        datetime.datetime.now(tz)
+        datetime.datetime.now(PACIFIC_TZ)
         .replace(hour=0, minute=0, second=0, microsecond=0)
         + datetime.timedelta(days=offset_days)
     )
@@ -45,8 +48,7 @@ def search_events(query: str, days: int = 30, limit: int = 10):
     """Search upcoming calendar events for the given text."""
     creds = get_credentials()
     service = build('calendar', 'v3', credentials=creds)
-    tz = datetime.datetime.now().astimezone().tzinfo
-    start = datetime.datetime.now(tz)
+    start = datetime.datetime.now(PACIFIC_TZ)
     end = start + datetime.timedelta(days=days)
     events_result = service.events().list(
         calendarId='primary',
@@ -77,9 +79,10 @@ def create_event(text: str) -> str:
         return 'Could not parse time.'
 
     phrase, when = matches[0]
-    tz = datetime.datetime.now().astimezone().tzinfo
     if when.tzinfo is None:
-        when = when.replace(tzinfo=tz)
+        when = when.replace(tzinfo=PACIFIC_TZ)
+    else:
+        when = when.astimezone(PACIFIC_TZ)
     start = when
     end = start + datetime.timedelta(hours=1)
 
