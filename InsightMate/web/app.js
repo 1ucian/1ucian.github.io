@@ -12,6 +12,20 @@ const settingsModal = new bootstrap.Modal(document.getElementById('settings-moda
 const themeSelect = document.getElementById('theme-select');
 const modelSelect = document.getElementById('model-select');
 
+const TYPE_DELAY = 8; // ms per character
+
+function processThought(text, durationSec) {
+  const start = text.indexOf('Thinking...');
+  const end = text.indexOf('...done thinking');
+  if (start !== -1 && end !== -1 && end > start) {
+    const thought = text.slice(start + 11, end).trim();
+    const rest = text.slice(end + 16).trim();
+    const summary = `Thought for ${durationSec.toFixed(1)} seconds`;
+    return `<details><summary>${summary}</summary>\n${thought}\n</details>\n\n${rest}`;
+  }
+  return text;
+}
+
 function addMessage(sender, text, typing = false) {
   const div = document.createElement('div');
   div.classList.add('message', sender === 'You' ? 'you' : 'assistant');
@@ -27,7 +41,7 @@ function addMessage(sender, text, typing = false) {
         span.textContent += text[i];
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
         i++;
-        setTimeout(type, 20);
+        setTimeout(type, TYPE_DELAY);
       } else {
         span.innerHTML = marked.parse(text);
         const log = JSON.parse(localStorage.getItem('chatlog') || '[]');
@@ -101,6 +115,7 @@ function sendMessage() {
   addMessage('You', text);
   input.value = '';
   const placeholder = addMessage('Assistant', '...', false);
+  const start = Date.now();
   fetch('/chat', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -109,7 +124,9 @@ function sendMessage() {
   .then(res => res.json())
   .then(data => {
     messagesDiv.removeChild(placeholder);
-    addMessage('Assistant', data.reply, true);
+    const duration = (Date.now() - start) / 1000;
+    const msg = processThought(data.reply, duration);
+    addMessage('Assistant', msg, true);
   })
   .catch(err => {
     messagesDiv.removeChild(placeholder);

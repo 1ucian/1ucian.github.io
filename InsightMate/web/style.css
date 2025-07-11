@@ -24,3 +24,14 @@ body.light .message.assistant {
 body.light .message.you {
   background-color: #0d6efd;
 }
+
+details {
+  margin-bottom: 0.5rem;
+}
+details summary {
+  cursor: pointer;
+  color: #0d6efd;
+}
+body.light details summary {
+  color: #003366;
+}
