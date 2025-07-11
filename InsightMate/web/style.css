@@ -1,0 +1,26 @@
+.message {
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+.message.you {
+  background-color: #0d6efd;
+  color: #fff;
+  align-self: flex-end;
+}
+.message.assistant {
+  background-color: #343a40;
+  color: #fff;
+  align-self: flex-start;
+}
+body.light {
+  background-color: #fff !important;
+  color: #000 !important;
+}
+body.light .message.assistant {
+  background-color: #f0f0f0;
+  color: #000;
+}
+body.light .message.you {
+  background-color: #0d6efd;
+}

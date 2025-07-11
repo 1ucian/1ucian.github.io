@@ -1,0 +1,90 @@
+const messagesDiv = document.getElementById('messages');
+const reminderDiv = document.getElementById('reminder-list');
+const taskDiv = document.getElementById('task-list');
+const memoryDiv = document.getElementById('memory-list');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send-btn');
+const settingsBtn = document.getElementById('settings-btn');
+const settingsModal = new bootstrap.Modal(document.getElementById('settings-modal'));
+const themeSelect = document.getElementById('theme-select');
+const modelSelect = document.getElementById('model-select');
+
+function addMessage(sender, text) {
+  const div = document.createElement('div');
+  div.classList.add('message', sender === 'You' ? 'you' : 'assistant');
+  div.innerHTML = `<strong>${sender}:</strong> ` + marked.parse(text);
+  messagesDiv.appendChild(div);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  const log = JSON.parse(localStorage.getItem('chatlog') || '[]');
+  log.push({sender, text});
+  localStorage.setItem('chatlog', JSON.stringify(log));
+}
+
+function renderList(container, items, formatter) {
+  container.innerHTML = '';
+  items.forEach(i => {
+    const d = document.createElement('div');
+    d.className = 'small mb-1';
+    d.textContent = formatter(i);
+    container.appendChild(d);
+  });
+}
+
+function fetchData() {
+  fetch('/reminders').then(r => r.json()).then(d => {
+    renderList(reminderDiv, d.reminders || [], r => `${r.time} - ${r.text}`);
+  }).catch(() => {});
+  fetch('/tasks').then(r => r.json()).then(d => {
+    renderList(taskDiv, d.tasks || [], t => `${t.schedule} - ${t.description}`);
+  }).catch(() => {});
+  fetch('/memory').then(r => r.json()).then(d => {
+    renderList(memoryDiv, d.messages || [], m => `${m.sender}: ${m.text}`);
+  }).catch(() => {});
+}
+
+function applyTheme(theme) {
+  document.body.classList.toggle('light', theme === 'light');
+}
+
+function loadSettings() {
+  const theme = localStorage.getItem('theme') || 'dark';
+  const model = localStorage.getItem('model') || 'gpt-4o';
+  themeSelect.value = theme;
+  modelSelect.value = model;
+  applyTheme(theme);
+}
+
+function saveSettings() {
+  localStorage.setItem('theme', themeSelect.value);
+  localStorage.setItem('model', modelSelect.value);
+  applyTheme(themeSelect.value);
+}
+
+function sendMessage() {
+  const text = input.value.trim();
+  if (!text) return;
+  addMessage('You', text);
+  input.value = '';
+  fetch('/chat', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({query: text, model: localStorage.getItem('model') || 'gpt-4o'})
+  })
+  .then(res => res.json())
+  .then(data => addMessage('Assistant', data.reply))
+  .catch(err => addMessage('Error', err.toString()))
+  .finally(fetchData);
+}
+
+sendBtn.addEventListener('click', sendMessage);
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+settingsBtn.addEventListener('click', () => settingsModal.show());
+document.getElementById('save-settings').addEventListener('click', saveSettings);
+
+loadSettings();
+fetchData();
