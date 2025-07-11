@@ -38,17 +38,70 @@ from memory_db import (
     save_calendar_events,
     get_recent_messages,
 )
+from summarizer import summarize_text
+
+last_tool_output = {}
+
+TOOL_REGISTRY = {
+    "search_email": lambda a: search_emails(a.get("query", "")),
+    "get_calendar": lambda a: (
+        list_events_for_day(parse_date(a.get("date", "today")).strftime("%Y-%m-%d"))
+        if parse_date(a.get("date", "today")) else "\u26a0\ufe0f Invalid date"
+    ),
+    "summarize": lambda a: summarize_text(
+        last_tool_output.get(
+            a.get("source") or next(iter(last_tool_output), None),
+            "\u26a0\ufe0f No previous tool output"
+        )
+    ),
+    "schedule_event": lambda a: create_event(
+        f"{a.get('title', 'Appointment')} {a.get('time', '21:00')}"
+    )
+}
 
 load_dotenv()
 
 
 def chat_completion(model: str, messages: list[dict]) -> str:
-    """Call the OpenAI chat completion API compatible with v1.x or older."""
-    if hasattr(openai, "chat") and hasattr(openai.chat, "completions"):
-        resp = openai.chat.completions.create(model=model, messages=messages)
-        return resp.choices[0].message.content.strip()
-    resp = openai.ChatCompletion.create(model=model, messages=messages)
-    return resp["choices"][0]["message"]["content"].strip()
+    """Use OpenAI (non-streaming) or stream from local Ollama (e.g. Qwen 30B A3b)."""
+
+    if model.startswith("gpt-"):
+        # OpenAI fallback
+        import openai
+        return openai.ChatCompletion.create(
+            model=model,
+            messages=messages
+        )["choices"][0]["message"]["content"].strip()
+
+    # Stream from Ollama local model
+    response = requests.post(
+        "http://localhost:11434/api/chat",
+        json={
+            "model": model,
+            "messages": messages,
+            "stream": True
+        },
+        stream=True
+    )
+    response.raise_for_status()
+
+    full_reply = ""
+    for line in response.iter_lines():
+        if not line:
+            continue
+        if line.startswith(b'data: '):
+            line = line[6:]
+        try:
+            chunk = line.decode("utf-8").strip()
+            if chunk == "[DONE]":
+                break
+            content = requests.utils.json.loads(chunk).get("message", {}).get("content", "")
+            full_reply += content
+        except Exception as e:
+            full_reply += f"\n\u26a0\ufe0f Stream decode error: {e}"
+            break
+
+    return full_reply.strip()
 
 def _get_config():
     return load_config()
@@ -236,27 +289,52 @@ def generate_response(user_prompt: str, data: dict, cot_mode: bool) -> str:
     return gpt(prompt, cot_mode=cot_mode)
 
 
-def plan_then_answer(prompt: str, cot_mode: bool = False) -> str:
-    """Plan actions once, execute them and generate the final reply."""
+def plan_then_answer(user_prompt: str):
+    prompt_clean = user_prompt.lower().strip()
+
+    # Handle small talk or casual prompts
+    if prompt_clean in ["hi", "hello", "hey", "how are you", "yo", "what's up", "sup", "good morning", "good evening"]:
+        return chat_completion("gpt-4", [{"role": "user", "content": user_prompt}])
+
+    # Attempt to plan actions
     try:
-        actions = plan_actions(prompt)
-    except Exception:
+        actions = plan_actions(user_prompt)
+    except Exception as e:
+        return "\u26a0\ufe0f Planning failed: " + str(e)
+
+    # Fallback if no actions returned
+    if not actions or len(actions) == 0:
         return "\u26a0\ufe0f I couldn't determine what action to take."
 
-    results: dict = {}
-    for action in actions:
-        if action.get("type") == "search_email":
-            results["email"] = search_emails(action.get("query", ""))
-        elif action.get("type") == "get_calendar":
-            date_str = action.get("date", "today")
-            results["calendar"] = list_events_for_day(date_str)
-        elif action.get("type") == "schedule_event":
-            title = action.get("title", "Appointment")
-            time = action.get("time", "21:00")
-            results["event"] = create_event(f"{title} {time}")
+    results = {}
 
-    reply = generate_response(prompt, results, cot_mode)
-    return reply
+    # Dynamically execute actions using TOOL_REGISTRY
+    for action in actions:
+        action_type = action.get("type")
+        if action_type in TOOL_REGISTRY:
+            try:
+                result = TOOL_REGISTRY[action_type](action)
+                results[action_type] = result
+            except Exception as e:
+                results[action_type] = f"\u26a0\ufe0f Tool error: {str(e)}"
+        else:
+            results[action_type] = "\u26a0\ufe0f Unknown action type"
+
+    # Save results for follow-up summarization
+    for key, val in results.items():
+        last_tool_output[key] = val
+
+    return format_results(results)
+
+
+def format_results(results):
+    reply = []
+    for k, v in results.items():
+        if isinstance(v, list):
+            reply.append(f"{k}:\n" + "\n".join(str(i) for i in v))
+        else:
+            reply.append(f"{k}: {v}")
+    return "\n\n".join(reply)
 
 
 def _extract_minutes(text: str) -> Optional[int]:
@@ -402,7 +480,7 @@ def route(query: str) -> str:
             else:
                 reply = f"From {email['from']}: {email['subject']} - {email['snippet']}"
         else:
-            reply = plan_then_answer(query, cot_mode)
+            reply = plan_then_answer(query)
     elif any(k in q for k in CALENDAR_KEYWORDS):
         if _needs_calendar_events(query):
             offset = 0
@@ -422,7 +500,7 @@ def route(query: str) -> str:
                 lines = [f"{e['start']} {e['title']}" for e in events]
                 reply = '\n'.join(lines)
         else:
-            reply = plan_then_answer(query, cot_mode)
+            reply = plan_then_answer(query)
     elif any(k in q for k in ONEDRIVE_KEYWORDS):
         if 'list' in q and 'word' in q:
             docs = list_word_docs()
@@ -494,6 +572,6 @@ def route(query: str) -> str:
     elif 'open' in q or 'launch' in q or 'play' in q:
         reply = execute_action(query)
     else:
-        reply = plan_then_answer(query, cot_mode)
+        reply = plan_then_answer(query)
     save_message(query, reply)
     return reply
