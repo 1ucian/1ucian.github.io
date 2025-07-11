@@ -35,7 +35,7 @@ Conversation history, unread email summaries and calendar events are stored loca
   generates a short bullet plan, runs a brief analysis loop to refine it, then replies with both the plan,
   notes from that analysis and the final answer.
 
-InsightMate understands commands like `search email <keywords>`, `read email <keywords>`, `search calendar <keywords>`, `add event <title> <time>` and `send email <address> <subject> <message>`.
+InsightMate understands commands like `search email <keywords>`, `read email <keywords>`, `search calendar <keywords>`, `add event <title> <time>` (you can also say `set appointment for 9pm sleep`) and `send email <address> <subject> <message>`.
 
 Calendar events are scheduled in **Pacific Time** regardless of the host system's timezone.
 

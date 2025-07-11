@@ -61,6 +61,16 @@ SEARCH_EMAIL_PREFIXES = (
 SEARCH_EVENT_PREFIXES = (
     'search calendar', 'search event', 'find event', 'find events'
 )
+CREATE_EVENT_PREFIXES = (
+    'add event',
+    'create event',
+    'new event',
+    'schedule event',
+    'set appointment',
+    'schedule appointment',
+    'set meeting',
+    'schedule meeting',
+)
 SEND_EMAIL_PREFIXES = ('send email', 'email to', 'compose email')
 READ_EMAIL_PREFIXES = ('read email', 'open email', 'view email')
 
@@ -288,11 +298,11 @@ def route(query: str) -> str:
             if subject is not None:
                 send_email(addr, subject, body)
                 reply = 'Email sent.'
-    elif q.startswith('add event') or q.startswith('create event') or q.startswith('new event'):
+    elif any(q.startswith(p) for p in CREATE_EVENT_PREFIXES):
         reply = create_event(query)
         if reply == 'Could not parse time.':
             title = query
-            for p in ('add event', 'create event', 'new event'):
+            for p in CREATE_EVENT_PREFIXES:
                 if title.lower().startswith(p):
                     title = title[len(p):].strip()
                     break
