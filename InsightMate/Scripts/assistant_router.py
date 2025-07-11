@@ -55,6 +55,10 @@ def _get_config():
 
 
 def plan_actions(user_prompt: str) -> list[dict]:
+    reasoning_mode = False
+    if "explain" in user_prompt.lower() or "how did you decide" in user_prompt.lower():
+        reasoning_mode = True
+
     planning_prompt = f"""You are an AI planner. Based on the user's input, decide which tools to use. Output a JSON list.
 
 User prompt:
@@ -71,6 +75,8 @@ Example response:
         {"role": "system", "content": "You're a tool planning assistant."},
         {"role": "user", "content": planning_prompt},
     ]
+    if reasoning_mode:
+        messages.insert(0, {"role": "system", "content": "Think step by step and explain what you are doing and why."})
 
     import openai
     response = openai.ChatCompletion.create(
@@ -172,7 +178,9 @@ def gpt(prompt: str) -> str:
     system_prompt = get_prompt(cfg)
     history = get_recent_messages(10)
     messages = [{"role": "system", "content": system_prompt}]
-    messages += [{"role": m[1], "content": m[2]} for m in history]
+    for m in history:
+        messages.append({"role": "user", "content": m["user"]})
+        messages.append({"role": "assistant", "content": m["assistant"]})
     messages.append({"role": "user", "content": prompt})
     if llm in {"gpt-4", "gpt-4o", "o4-mini", "o4-mini-high"}:
         if not api_key:
@@ -240,7 +248,6 @@ def _extract_minutes(text: str) -> Optional[int]:
 
 
 def route(query: str) -> str:
-    save_message('user', query)
     q = query.lower()
     reply = ''
     global PENDING_EMAIL, PENDING_EVENT
@@ -250,20 +257,20 @@ def route(query: str) -> str:
             PENDING_EMAIL['address'] = query.strip()
             PENDING_EMAIL['step'] = 'subject'
             reply = 'What is the subject?'
-            save_message('assistant', reply)
+            save_message(query, reply)
             return reply
         if PENDING_EMAIL['step'] == 'subject':
             PENDING_EMAIL['subject'] = query.strip()
             PENDING_EMAIL['step'] = 'body'
             reply = 'What should the email say?'
-            save_message('assistant', reply)
+            save_message(query, reply)
             return reply
         if PENDING_EMAIL['step'] == 'body':
             PENDING_EMAIL['body'] = query.strip()
             send_email(PENDING_EMAIL['address'], PENDING_EMAIL['subject'], PENDING_EMAIL['body'])
             reply = 'Email sent.'
             PENDING_EMAIL = {'step': None, 'address': None, 'subject': None, 'body': None}
-            save_message('assistant', reply)
+            save_message(query, reply)
             return reply
     if PENDING_EVENT['step']:
         if PENDING_EVENT['step'] == 'time':
@@ -271,10 +278,10 @@ def route(query: str) -> str:
             reply = create_event(text)
             if reply == 'Could not parse time.':
                 reply = 'Sorry, I could not understand the time. Please try again.'
-                save_message('assistant', reply)
+                save_message(query, reply)
                 return reply
             PENDING_EVENT = {'step': None, 'title': None, 'time': None}
-            save_message('assistant', reply)
+            save_message(query, reply)
             return reply
     if any(q.startswith(p) for p in READ_EMAIL_PREFIXES):
         parts = query.split(' ', 2)
@@ -440,7 +447,7 @@ def route(query: str) -> str:
         if not mem:
             reply = 'No memory.'
         else:
-            lines = [f"{m[0]} {m[1]}: {m[2]}" for m in mem]
+            lines = [f"User: {m['user']}\nAssistant: {m['assistant']}" for m in mem]
             reply = '\n'.join(lines)
     elif 'where am i' in q or 'my location' in q or q.startswith('location'):
         reply = _get_location()
@@ -457,5 +464,5 @@ def route(query: str) -> str:
         reply = execute_action(query)
     else:
         reply = plan_then_answer(query)
-    save_message('assistant', reply)
+    save_message(query, reply)
     return reply

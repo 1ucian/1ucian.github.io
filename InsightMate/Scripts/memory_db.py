@@ -16,8 +16,8 @@ def init_db():
         'CREATE TABLE IF NOT EXISTS messages ('
         'id INTEGER PRIMARY KEY AUTOINCREMENT,'
         'ts DATETIME DEFAULT CURRENT_TIMESTAMP,'
-        'sender TEXT,'
-        'text TEXT'
+        'user TEXT,'
+        'assistant TEXT'
         ')'
     )
     c.execute(
@@ -62,27 +62,28 @@ def init_db():
 init_db()
 
 
-def save_message(sender: str, text: str, limit: int = 100) -> None:
+def save_message(user_input: str, ai_reply: str, limit: int = 100) -> None:
+    """Save a user/assistant message pair and prune old history."""
     conn = _connect()
-    conn.execute('INSERT INTO messages(sender, text) VALUES (?, ?)', (sender, text))
+    conn.execute(
+        'INSERT INTO messages(user, assistant) VALUES (?, ?)',
+        (user_input, ai_reply),
+    )
     conn.commit()
-    _prune_and_summarize(conn, limit)
+    _prune(conn, limit)
     conn.close()
 
-def _prune_and_summarize(conn: sqlite3.Connection, limit: int) -> None:
+def _prune(conn: sqlite3.Connection, limit: int) -> None:
+    """Keep only the most recent ``limit`` message pairs."""
     cur = conn.cursor()
     cur.execute('SELECT COUNT(*) FROM messages')
     count = cur.fetchone()[0]
     if count <= limit:
         return
-    cur.execute('SELECT id, sender, text FROM messages ORDER BY id ASC')
-    rows = cur.fetchall()
-    excess = rows[:-limit]
-    summary_text = ' '.join(f"{r[1]}: {r[2]}" for r in excess)
-    summary_text = summary_text[:500]
-    last_id = excess[-1][0]
-    cur.execute('DELETE FROM messages WHERE id <= ?', (last_id,))
-    cur.execute('INSERT INTO messages(sender, text) VALUES (?, ?)', ('assistant', f'Conversation summary: {summary_text}'))
+    cur.execute(
+        'DELETE FROM messages WHERE id NOT IN (SELECT id FROM messages ORDER BY id DESC LIMIT ?)',
+        (limit,),
+    )
     conn.commit()
 
 
@@ -111,13 +112,15 @@ def save_calendar_events(events: List[Dict[str, str]]) -> None:
     conn.close()
 
 
-def get_recent_messages(limit: int = 20) -> List[Tuple[str, str, str]]:
+def get_recent_messages(limit: int = 5) -> List[Dict[str, str]]:
+    """Return the most recent message pairs in chronological order."""
     conn = _connect()
     c = conn.cursor()
-    c.execute('SELECT ts, sender, text FROM messages ORDER BY id DESC LIMIT ?', (limit,))
+    c.execute('SELECT user, assistant FROM messages ORDER BY id DESC LIMIT ?', (limit,))
     rows = c.fetchall()
     conn.close()
-    return rows
+    rows.reverse()
+    return [{'user': r[0], 'assistant': r[1]} for r in rows]
 
 
 def save_reminder(text: str, run_time: str) -> None:

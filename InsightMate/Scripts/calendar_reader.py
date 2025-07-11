@@ -26,15 +26,28 @@ FILLER_WORDS = (
 PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
 
 
-def list_events_for_day(offset_days: int) -> list[dict]:
-    """Return calendar events for today plus ``offset_days`` days."""
+def list_events_for_day(day: int | str) -> list[dict]:
+    """Return calendar events for the given day.
+
+    ``day`` may be an integer offset from today or an ISO ``YYYY-MM-DD`` string.
+    """
     creds = get_credentials()
     service = build('calendar', 'v3', credentials=creds)
-    start = (
-        datetime.datetime.now(PACIFIC_TZ)
-        .replace(hour=0, minute=0, second=0, microsecond=0)
-        + datetime.timedelta(days=offset_days)
-    )
+    if isinstance(day, int):
+        start = (
+            datetime.datetime.now(PACIFIC_TZ)
+            .replace(hour=0, minute=0, second=0, microsecond=0)
+            + datetime.timedelta(days=day)
+        )
+    else:
+        parsed = parse_date(str(day))
+        if not parsed:
+            return []
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=PACIFIC_TZ)
+        else:
+            parsed = parsed.astimezone(PACIFIC_TZ)
+        start = parsed.replace(hour=0, minute=0, second=0, microsecond=0)
     end = start + datetime.timedelta(days=1)
     events_result = (
         service.events()
