@@ -8,7 +8,12 @@ from config import load_config, get_api_key, get_llm, get_prompt
 
 from onedrive_reader import search, list_word_docs
 from gmail_reader import fetch_unread_email, search_emails
-from calendar_reader import list_today_events, list_events_for_day, search_events
+from calendar_reader import (
+    list_today_events,
+    list_events_for_day,
+    search_events,
+    create_event,
+)
 from dateparser import parse as parse_date
 from reminder_scheduler import (
     schedule as schedule_reminder,
@@ -121,6 +126,8 @@ def route(query: str) -> str:
             else:
                 lines = [f"{e['start']} {e['title']}" for e in events]
                 reply = '\n'.join(lines)
+    elif q.startswith('add event') or q.startswith('create event') or q.startswith('new event'):
+        reply = create_event(query)
     elif any(k in q for k in EMAIL_KEYWORDS):
         email = fetch_unread_email()
         save_email(email)
