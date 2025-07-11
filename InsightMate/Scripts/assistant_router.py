@@ -171,11 +171,19 @@ def _needs_calendar_events(query: str) -> bool:
     return any(t in q for t in triggers)
 
 
-def gpt(prompt: str) -> str:
+def gpt(prompt: str, cot_mode: bool = False) -> str:
+    """Return an LLM reply using the configured model."""
     cfg = _get_config()
     llm = get_llm(cfg).lower()
     api_key = get_api_key(cfg)
-    system_prompt = get_prompt(cfg)
+    if cot_mode:
+        system_prompt = (
+            "You are InsightMate. Think step by step, plan your actions, then "
+            "execute them. Do not repeat your reasoning. Only respond once. "
+            "Keep response short unless told otherwise."
+        )
+    else:
+        system_prompt = "You are InsightMate. Respond concisely and act immediately."
     history = get_recent_messages(10)
     messages = [{"role": "system", "content": system_prompt}]
     for m in history:
@@ -219,18 +227,36 @@ def _analysis_loop(prompt: str, plan: str, rounds: int = 3) -> str:
     return "\n".join(notes)
 
 
-def plan_then_answer(prompt: str) -> str:
-    """Generate a short bullet plan, analyze it in a loop, then answer."""
-    plan = gpt(
-        "Break down the following request into 2-4 short bullet steps. "
-        "Only return the bullet list.\n" + prompt
+def generate_response(user_prompt: str, data: dict, cot_mode: bool) -> str:
+    """Create the final reply using the gathered ``data``."""
+    prompt = (
+        f"User request: {user_prompt}\n\nResults:\n{json.dumps(data, indent=2)}\n\n"
+        "Provide a helpful answer summarizing any important information."
     )
-    analysis = _analysis_loop(prompt, plan)
-    answer = gpt(
-        "Using the plan and notes below, provide the final answer.\n\n"
-        f"Plan:\n{plan}\n\nNotes:\n{analysis}\n\nQuestion: {prompt}"
-    )
-    return plan + "\n\n" + analysis + "\n\n" + answer
+    return gpt(prompt, cot_mode=cot_mode)
+
+
+def plan_then_answer(prompt: str, cot_mode: bool = False) -> str:
+    """Plan actions once, execute them and generate the final reply."""
+    try:
+        actions = plan_actions(prompt)
+    except Exception:
+        return "\u26a0\ufe0f I couldn't determine what action to take."
+
+    results: dict = {}
+    for action in actions:
+        if action.get("type") == "search_email":
+            results["email"] = search_emails(action.get("query", ""))
+        elif action.get("type") == "get_calendar":
+            date_str = action.get("date", "today")
+            results["calendar"] = list_events_for_day(date_str)
+        elif action.get("type") == "schedule_event":
+            title = action.get("title", "Appointment")
+            time = action.get("time", "21:00")
+            results["event"] = create_event(f"{title} {time}")
+
+    reply = generate_response(prompt, results, cot_mode)
+    return reply
 
 
 def _extract_minutes(text: str) -> Optional[int]:
@@ -248,7 +274,12 @@ def _extract_minutes(text: str) -> Optional[int]:
 
 
 def route(query: str) -> str:
+    cot_mode = False
     q = query.lower()
+    if "/think" in q:
+        cot_mode = True
+        query = query.replace("/think", "").strip()
+        q = query.lower()
     reply = ''
     global PENDING_EMAIL, PENDING_EVENT
 
@@ -371,7 +402,7 @@ def route(query: str) -> str:
             else:
                 reply = f"From {email['from']}: {email['subject']} - {email['snippet']}"
         else:
-            reply = plan_then_answer(query)
+            reply = plan_then_answer(query, cot_mode)
     elif any(k in q for k in CALENDAR_KEYWORDS):
         if _needs_calendar_events(query):
             offset = 0
@@ -391,7 +422,7 @@ def route(query: str) -> str:
                 lines = [f"{e['start']} {e['title']}" for e in events]
                 reply = '\n'.join(lines)
         else:
-            reply = plan_then_answer(query)
+            reply = plan_then_answer(query, cot_mode)
     elif any(k in q for k in ONEDRIVE_KEYWORDS):
         if 'list' in q and 'word' in q:
             docs = list_word_docs()
@@ -463,6 +494,6 @@ def route(query: str) -> str:
     elif 'open' in q or 'launch' in q or 'play' in q:
         reply = execute_action(query)
     else:
-        reply = plan_then_answer(query)
+        reply = plan_then_answer(query, cot_mode)
     save_message(query, reply)
     return reply
