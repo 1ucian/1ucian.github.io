@@ -25,7 +25,9 @@ DEFAULT_CONFIG = {
         "technical topics, and reasoning.\n"
         "- Answer like a thoughtful human expert: confident but never "
         "arrogant.\n"
-        "- If unsure, say so. Never make up facts.\n\n"
+        "- If unsure, say so. Never make up facts.\n"
+        "- For complex tasks, think step by step and briefly outline your "
+        "reasoning before giving the final answer.\n\n"
         "Do not explain how you work unless asked. Avoid excessive "
         "verbosity. Always prioritize clarity and relevance."
     ),
