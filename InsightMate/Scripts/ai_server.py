@@ -2,14 +2,13 @@ import os
 from flask import Flask, request, jsonify
 import openai
 from dotenv import load_dotenv
-from assistant_router import route
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-STATIC_DIR = os.path.join(BASE_DIR, '../web')
-app = Flask(__name__, static_folder=STATIC_DIR, static_url_path='')
+
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
+
+register_common(app)
 
 
 def chat_completion(model: str, messages: list[dict]) -> str:
@@ -41,17 +40,4 @@ def process():
     return jsonify({'reply': reply})
 
 
-@app.route('/chat', methods=['POST'])
-def chat():
-    data = request.get_json() or {}
-    query = data.get('query', '')
-    reply = route(query)
-    return jsonify({'reply': reply})
 
-
-@app.route('/')
-def index():
-    return app.send_static_file('index.html')
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
