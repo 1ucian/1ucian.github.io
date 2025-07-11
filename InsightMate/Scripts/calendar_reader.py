@@ -5,6 +5,23 @@ from googleapiclient.discovery import build
 from google_auth import get_credentials
 from dateparser.search import search_dates
 
+CREATE_EVENT_PREFIXES = (
+    'add event',
+    'create event',
+    'new event',
+    'schedule event',
+    'set appointment',
+    'schedule appointment',
+    'set meeting',
+    'schedule meeting',
+)
+
+FILLER_WORDS = (
+    'for',
+    'at',
+    'on',
+)
+
 # Use Pacific time for all calendar operations
 PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
 
@@ -74,7 +91,11 @@ def create_event(text: str) -> str:
     The first recognizable date in ``text`` is used as the start time and the
     remainder becomes the title. A one hour duration is assumed.
     """
-    matches = search_dates(text, settings={'PREFER_DATES_FROM': 'future'})
+    matches = search_dates(
+        text,
+        settings={'PREFER_DATES_FROM': 'future'},
+        languages=['en'],
+    )
     if not matches:
         return 'Could not parse time.'
 
@@ -87,9 +108,13 @@ def create_event(text: str) -> str:
     end = start + datetime.timedelta(hours=1)
 
     title = text.replace(phrase, '').strip()
-    for p in ('add event', 'create event', 'new event', 'schedule event'):
+    for p in CREATE_EVENT_PREFIXES:
         if title.lower().startswith(p):
             title = title[len(p):].strip()
+            break
+    for word in FILLER_WORDS:
+        if title.lower().startswith(word + ' '):
+            title = title[len(word) + 1:].strip()
             break
     if not title:
         title = 'New Event'
