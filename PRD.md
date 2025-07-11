@@ -7,6 +7,7 @@ InsightMate is a cross-platform personal assistant bundled within this repositor
 - Provide a local, privacy‑conscious assistant that integrates with existing desktop data (Gmail, Calendar and OneDrive).
 - Offer flexible language model choices (OpenAI API or local Llama 3 via Ollama).
 - Allow quick interaction through an always‑on UI with optional voice input and system tray control.
+- Maintain compatibility with the Model Context Protocol (MCP) standard to simplify future integrations.
 
 ## Current Features
 - **Python backend** with Flask `chat_server.py` for routing assistant queries and scheduling reminders.
@@ -38,6 +39,7 @@ InsightMate is a cross-platform personal assistant bundled within this repositor
 - Design a plugin architecture allowing community contributions for new data sources or automations.
 - Publish API documentation and a web portal on 1ucian.me for user guides and updates.
 - Leverage the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) platform so all components integrate seamlessly.
+- Ensure all connectors and modules conform to the MCP standard so the assistant remains portable and easy to extend.
 
 ## Non‑Goals
 - Running the assistant as a hosted web service (the focus remains on local execution).
