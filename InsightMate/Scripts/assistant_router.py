@@ -27,6 +27,15 @@ from memory_db import (
 
 load_dotenv()
 
+
+def chat_completion(model: str, messages: list[dict]) -> str:
+    """Call the OpenAI chat completion API compatible with v1.x or older."""
+    if hasattr(openai, "chat") and hasattr(openai.chat, "completions"):
+        resp = openai.chat.completions.create(model=model, messages=messages)
+        return resp.choices[0].message.content.strip()
+    resp = openai.ChatCompletion.create(model=model, messages=messages)
+    return resp["choices"][0]["message"]["content"].strip()
+
 def _get_config():
     return load_config()
 
@@ -49,8 +58,7 @@ def gpt(prompt: str) -> str:
             model = 'gpt-4'
         else:
             model = llm
-        resp = openai.ChatCompletion.create(model=model, messages=[{"role": "user", "content": prompt}])
-        return resp['choices'][0]['message']['content'].strip()
+        return chat_completion(model, [{"role": "user", "content": prompt}])
     model = llm if llm else 'llama3'
     out = subprocess.check_output(['ollama', 'run', model, prompt])
     return out.decode().strip()

@@ -9,6 +9,15 @@ app = Flask(__name__)
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
+
+def chat_completion(model: str, messages: list[dict]) -> str:
+    """Call the OpenAI chat completion API compatible with v1.x or older."""
+    if hasattr(openai, "chat") and hasattr(openai.chat, "completions"):
+        resp = openai.chat.completions.create(model=model, messages=messages)
+        return resp.choices[0].message.content.strip()
+    resp = openai.ChatCompletion.create(model=model, messages=messages)
+    return resp["choices"][0]["message"]["content"].strip()
+
 @app.route('/process', methods=['POST'])
 def process():
     data = request.get_json() or {}
@@ -26,11 +35,7 @@ def process():
         f"User question: {user_prompt}\n"
         "Answer appropriately."
     )
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    reply = response['choices'][0]['message']['content'].strip()
+    reply = chat_completion("gpt-4", [{"role": "user", "content": prompt}])
     return jsonify({'reply': reply})
 
 
@@ -41,11 +46,7 @@ def chat():
     routed = route_query(query)
     if routed is not None:
         return jsonify({'reply': routed})
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": query}]
-    )
-    reply = response['choices'][0]['message']['content'].strip()
+    reply = chat_completion("gpt-4", [{"role": "user", "content": query}])
     return jsonify({'reply': reply})
 
 if __name__ == '__main__':
