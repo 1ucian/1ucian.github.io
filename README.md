@@ -31,8 +31,8 @@ Conversation history, unread email summaries and calendar events are stored loca
 - Older chat history is pruned and summarized automatically so the database stays small.
 - You can ask "what time is it" or "where am I" for current context.
 - A `run python <code>` command lets you quickly execute snippets.
-- Complex or ambiguous requests are handled with multi-step reasoning. The assistant outlines
-  short bullet steps before answering.
+- Complex or ambiguous requests are handled with multi-step thinking and processing. The assistant now
+  generates a short bullet plan, follows that plan, then replies with both the plan and final answer.
 
 InsightMate understands commands like `search email <keywords>`, `read email <keywords>`, `search calendar <keywords>`, `add event <title> <time>` and `send email <address> <subject> <message>`.
 
