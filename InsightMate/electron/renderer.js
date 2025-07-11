@@ -24,10 +24,12 @@ function processThought(text, durationSec) {
   const start = text.indexOf('Thinking...');
   const end = text.indexOf('...done thinking');
   if (start !== -1 && end !== -1 && end > start) {
-    const thought = text.slice(start + 11, end).trim();
+    let thought = text.slice(start + 11, end).trim();
     const rest = text.slice(end + 16).trim();
+    if (thought === '.') thought = '';
     const summary = `Thought for ${durationSec.toFixed(1)} seconds`;
-    return `<details><summary>${summary}</summary>\n${thought}\n</details>\n\n${rest}`;
+    const thoughtBlock = thought ? `${thought}\n` : '';
+    return `<details><summary>${summary}</summary>\n${thoughtBlock}</details>\n\n${rest}`;
   }
   return text;
 }
