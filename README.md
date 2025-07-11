@@ -32,7 +32,7 @@ Conversation history, unread email summaries and calendar events are stored loca
 - You can ask "what time is it" or "where am I" for current context.
 - A `run python <code>` command lets you quickly execute snippets.
 
-InsightMate understands commands like `search email <keywords>`, `search calendar <keywords>`, `add event <title> <time>` and `send email <address> <subject> <message>`.
+InsightMate understands commands like `search email <keywords>`, `read email <keywords>`, `search calendar <keywords>`, `add event <title> <time>` and `send email <address> <subject> <message>`.
 
 Calendar events are scheduled in **Pacific Time** regardless of the host system's timezone.
 

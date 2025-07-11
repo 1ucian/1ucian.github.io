@@ -8,7 +8,12 @@ from dotenv import load_dotenv
 from config import load_config, get_api_key, get_llm, get_prompt
 
 from onedrive_reader import search, list_word_docs
-from gmail_reader import fetch_unread_email, search_emails, send_email
+from gmail_reader import (
+    fetch_unread_email,
+    search_emails,
+    send_email,
+    read_email,
+)
 from calendar_reader import (
     list_today_events,
     list_events_for_day,
@@ -57,6 +62,7 @@ SEARCH_EVENT_PREFIXES = (
     'search calendar', 'search event', 'find event', 'find events'
 )
 SEND_EMAIL_PREFIXES = ('send email', 'email to', 'compose email')
+READ_EMAIL_PREFIXES = ('read email', 'open email', 'view email')
 
 # Track email composition across multiple turns
 PENDING_EMAIL: dict[str, str | None] = {
@@ -181,7 +187,20 @@ def route(query: str) -> str:
             PENDING_EVENT = {'step': None, 'title': None, 'time': None}
             save_message('assistant', reply)
             return reply
-    if any(q.startswith(p) for p in SEARCH_EMAIL_PREFIXES):
+    if any(q.startswith(p) for p in READ_EMAIL_PREFIXES):
+        parts = query.split(' ', 2)
+        if len(parts) < 3:
+            reply = 'Please provide email search terms.'
+        else:
+            term = parts[2]
+            email = read_email(term)
+            if not email:
+                reply = 'No matching email found.'
+            else:
+                save_email(email)
+                body = email.get('body', '')
+                reply = f"From {email['from']}: {email['subject']}\n{body}"
+    elif any(q.startswith(p) for p in SEARCH_EMAIL_PREFIXES):
         parts = query.split(' ', 2)
         if len(parts) < 3:
             reply = 'Please provide email search terms.'

@@ -17,6 +17,7 @@ InsightMate is a cross-platform personal assistant bundled within this repositor
 - **Local SQLite memory** (`memory_db.py`) storing chat transcripts, email summaries, calendar events, reminders and tasks.
 - **Email and calendar search** so the assistant can `search email` or `search calendar` for specific information on demand.
 - **Sending email** via the `send email` command to compose and dispatch Gmail messages.
+- **Reading full emails** with `read email <keywords>` to retrieve the full message body.
 
 ## Use Cases
 1. Quickly query recent email or calendar events while chatting with GPT‑4o.
