@@ -19,6 +19,7 @@ This repository contains the source for my personal site as well as **InsightMat
 13. The last few messages are sent to GPT‑4o, GPT‑4 or Qwen3 so chats keep their context across runs.
 14. To launch the Electron interface manually after the chat server is running, change to `InsightMate/electron` and run `npm start`. `setup.bat` performs this automatically when you run it.
 15. The Electron UI now shows **Reminders**, **Tasks** and a **Memory** panel so you can review scheduled jobs and recent conversations.
+16. Ask InsightMate to `search email <keywords>` or `search calendar <keywords>` to query your Gmail inbox or upcoming events. Matching results are saved to the local memory database.
 
 See [InsightMate/README.md](InsightMate/README.md) for more details.
 

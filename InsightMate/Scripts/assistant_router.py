@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 from config import load_config, get_api_key, get_llm, get_prompt
 
 from onedrive_reader import search, list_word_docs
-from gmail_reader import fetch_unread_email
-from calendar_reader import list_today_events
+from gmail_reader import fetch_unread_email, search_emails
+from calendar_reader import list_today_events, search_events
 from reminder_scheduler import (
     schedule as schedule_reminder,
     schedule_air_quality,
@@ -42,6 +42,8 @@ def _get_config():
 ONEDRIVE_KEYWORDS = {'onedrive', 'search', 'summarize', 'find', 'list'}
 EMAIL_KEYWORDS = {'gmail', 'email', 'inbox', 'mail'}
 CALENDAR_KEYWORDS = {'calendar', 'event', 'schedule'}
+SEARCH_EMAIL_PREFIXES = ('search email', 'find email', 'search emails', 'find emails')
+SEARCH_EVENT_PREFIXES = ('search calendar', 'search event', 'find event', 'find events')
 
 
 def gpt(prompt: str) -> str:
@@ -90,7 +92,34 @@ def route(query: str) -> str:
     save_message('user', query)
     q = query.lower()
     reply = ''
-    if any(k in q for k in EMAIL_KEYWORDS):
+    if any(q.startswith(p) for p in SEARCH_EMAIL_PREFIXES):
+        parts = query.split(' ', 2)
+        if len(parts) < 3:
+            reply = 'Please provide email search terms.'
+        else:
+            term = parts[2]
+            emails = search_emails(term)
+            for e in emails:
+                save_email(e)
+            if not emails:
+                reply = 'No matching emails found.'
+            else:
+                lines = [f"From {e['from']}: {e['subject']} - {e['snippet']}" for e in emails]
+                reply = '\n'.join(lines)
+    elif any(q.startswith(p) for p in SEARCH_EVENT_PREFIXES):
+        parts = query.split(' ', 2)
+        if len(parts) < 3:
+            reply = 'Please provide calendar search terms.'
+        else:
+            term = parts[2]
+            events = search_events(term)
+            save_calendar_events(events)
+            if not events:
+                reply = 'No matching events found.'
+            else:
+                lines = [f"{e['start']} {e['title']}" for e in events]
+                reply = '\n'.join(lines)
+    elif any(k in q for k in EMAIL_KEYWORDS):
         email = fetch_unread_email()
         save_email(email)
         if not email:

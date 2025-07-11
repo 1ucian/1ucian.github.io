@@ -16,6 +16,7 @@ InsightMate is a cross-platform personal assistant bundled within this repositor
 - **Data connectors** for Gmail/Calendar (`gmail_reader.py`, `calendar_reader.py`), OneDrive document search (`onedrive_reader.py`) and iMessage reading (`imessage_reader.py`).
 - **Reminder and task scheduling** implemented with `apscheduler` in `reminder_scheduler.py` for air quality, weather, email and calendar checks.
 - **Local SQLite memory** (`memory_db.py`) storing chat transcripts, email summaries, calendar events, reminders and tasks.
+- **Email and calendar search** so the assistant can `search email` or `search calendar` for specific information on demand.
 
 ## Use Cases
 1. Quickly query recent email or calendar events while chatting with GPT‑4o.
