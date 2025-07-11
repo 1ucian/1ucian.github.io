@@ -153,3 +153,11 @@ def list_tasks() -> List[Tuple[int, str, str, str]]:
     rows = c.fetchall()
     conn.close()
     return rows
+
+
+def clear_memory() -> None:
+    """Delete all chat messages from the local memory database."""
+    conn = _connect()
+    conn.execute('DELETE FROM messages')
+    conn.commit()
+    conn.close()
