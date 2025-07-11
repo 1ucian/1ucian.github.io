@@ -3,12 +3,19 @@ import sys
 import subprocess
 import threading
 import time
-import requests
-import tkinter as tk
-from tkinter import ttk
-from tkinter.scrolledtext import ScrolledText
-from PIL import Image
-import pystray
+try:
+    import requests
+    import tkinter as tk
+    from tkinter import ttk
+    from tkinter.scrolledtext import ScrolledText
+    from PIL import Image
+    import pystray
+except ImportError as e:
+    print(f"Missing dependency: {e.name}.\n"
+          "Run 'pip install -r requirements.txt' or execute 'windows_setup.ps1' "
+          "to install prerequisites.")
+    time.sleep(5)
+    sys.exit(1)
 from config import load_config, save_config
 
 class ChatGUI:
