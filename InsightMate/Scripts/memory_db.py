@@ -62,11 +62,28 @@ def init_db():
 init_db()
 
 
-def save_message(sender: str, text: str) -> None:
+def save_message(sender: str, text: str, limit: int = 100) -> None:
     conn = _connect()
     conn.execute('INSERT INTO messages(sender, text) VALUES (?, ?)', (sender, text))
     conn.commit()
+    _prune_and_summarize(conn, limit)
     conn.close()
+
+def _prune_and_summarize(conn: sqlite3.Connection, limit: int) -> None:
+    cur = conn.cursor()
+    cur.execute('SELECT COUNT(*) FROM messages')
+    count = cur.fetchone()[0]
+    if count <= limit:
+        return
+    cur.execute('SELECT id, sender, text FROM messages ORDER BY id ASC')
+    rows = cur.fetchall()
+    excess = rows[:-limit]
+    summary_text = ' '.join(f"{r[1]}: {r[2]}" for r in excess)
+    summary_text = summary_text[:500]
+    last_id = excess[-1][0]
+    cur.execute('DELETE FROM messages WHERE id <= ?', (last_id,))
+    cur.execute('INSERT INTO messages(sender, text) VALUES (?, ?)', ('assistant', f'Conversation summary: {summary_text}'))
+    conn.commit()
 
 
 def save_email(email: Dict[str, str]) -> None:

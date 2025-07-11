@@ -3,6 +3,7 @@ from email.header import decode_header, make_header
 from email.mime.text import MIMEText
 from googleapiclient.discovery import build
 import base64
+import os
 
 from google_auth import get_credentials
 
@@ -54,6 +55,12 @@ def send_email(to: str, subject: str, body: str) -> str:
     """Send an email using the user's Gmail account."""
     creds = get_credentials()
     service = build('gmail', 'v1', credentials=creds)
+    domain = os.getenv('EMAIL_DOMAIN', '')
+    if '@' not in to:
+        if domain:
+            to = f"{to}@{domain}"
+        else:
+            raise ValueError('Recipient address missing domain')
     msg = MIMEText(body)
     msg['to'] = to
     msg['subject'] = subject

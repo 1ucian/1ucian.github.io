@@ -11,7 +11,10 @@ This repository contains the source for my personal site as well as **InsightMat
    python -m venv venv
    venv/bin/pip install -r requirements.txt
    ```
-3. Copy `.env.example` to `.env` and set `OPENAI_API_KEY` if you want to use GPT‑4o or GPT‑4. Leaving the key blank will route requests to Qwen3 via Ollama.
+3. Copy `.env.example` to `.env` and set the environment values:
+   - `OPENAI_API_KEY` for GPT‑4o or GPT‑4 (leave blank for Qwen3)
+   - `EMAIL_DOMAIN` for recipient addresses without a domain
+   - `LATITUDE` and `LONGITUDE` for weather and air‑quality checks
 4. Place your Google API `credentials.json` in the `Scripts` directory and run `python gmail_reader.py` once to authorize Gmail and Calendar access. This creates `token.json` for future runs.
 5. Start the server:
 
@@ -22,6 +25,12 @@ This repository contains the source for my personal site as well as **InsightMat
 6. Open `http://<host>:5000/` in your browser (replace `<host>` with your computer's address). The server listens on all network interfaces so it can be reached from other devices on the same network.
 
 Conversation history, unread email summaries and calendar events are stored locally in `memory.db`. Settings are written to `config.json`.
+
+### Recent Updates
+- Email and calendar actions support multi-turn conversations. If you start composing an email or event without all the details, the assistant will ask follow-up questions.
+- Older chat history is pruned and summarized automatically so the database stays small.
+- You can ask "what time is it" or "where am I" for current context.
+- A `run python <code>` command lets you quickly execute snippets.
 
 InsightMate understands commands like `search email <keywords>`, `search calendar <keywords>`, `add event <title> <time>` and `send email <address> <subject> <message>`.
 
