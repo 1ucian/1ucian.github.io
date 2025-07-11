@@ -1,0 +1,6 @@
+body {
+  padding-top: 56px;
+}
+header.bg-primary {
+  background: linear-gradient(135deg, #0d6efd, #6610f2);
+}
