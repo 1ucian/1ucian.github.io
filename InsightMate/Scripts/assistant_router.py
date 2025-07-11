@@ -118,6 +118,24 @@ def _run_python(code: str) -> str:
         return str(e)
 
 
+def _needs_unread_email(query: str) -> bool:
+    """Return True if the user is likely requesting unread email."""
+    q = query.lower()
+    if 'email' not in q:
+        return False
+    triggers = ['check', 'unread', 'new', 'any', 'view', 'show', 'recent', 'inbox']
+    return any(t in q for t in triggers)
+
+
+def _needs_calendar_events(query: str) -> bool:
+    """Return True if the user is asking about calendar events."""
+    q = query.lower()
+    if 'calendar' not in q and 'event' not in q and 'schedule' not in q:
+        return False
+    triggers = ['check', 'what', 'show', 'view', 'list', 'any', 'today', 'tomorrow', 'yesterday', 'upcoming']
+    return any(t in q for t in triggers)
+
+
 def gpt(prompt: str) -> str:
     cfg = _get_config()
     llm = get_llm(cfg).lower()
@@ -309,29 +327,35 @@ def route(query: str) -> str:
             PENDING_EVENT = {'step': 'time', 'title': title, 'time': None}
             reply = 'When should this event occur?'
     elif any(k in q for k in EMAIL_KEYWORDS):
-        email = fetch_unread_email()
-        save_email(email)
-        if not email:
-            reply = 'No unread email.'
+        if _needs_unread_email(query):
+            email = fetch_unread_email()
+            save_email(email)
+            if not email:
+                reply = 'No unread email.'
+            else:
+                reply = f"From {email['from']}: {email['subject']} - {email['snippet']}"
         else:
-            reply = f"From {email['from']}: {email['subject']} - {email['snippet']}"
+            reply = plan_then_answer(query)
     elif any(k in q for k in CALENDAR_KEYWORDS):
-        offset = 0
-        if 'yesterday' in q:
-            offset = -1
-        elif 'tomorrow' in q:
-            offset = 1
+        if _needs_calendar_events(query):
+            offset = 0
+            if 'yesterday' in q:
+                offset = -1
+            elif 'tomorrow' in q:
+                offset = 1
+            else:
+                dt = parse_date(query, settings={'RELATIVE_BASE': datetime.datetime.utcnow()})
+                if dt:
+                    offset = (dt.date() - datetime.datetime.utcnow().date()).days
+            events = list_events_for_day(offset)
+            save_calendar_events(events)
+            if not events:
+                reply = 'No calendar events today.' if offset == 0 else 'No calendar events.'
+            else:
+                lines = [f"{e['start']} {e['title']}" for e in events]
+                reply = '\n'.join(lines)
         else:
-            dt = parse_date(query, settings={'RELATIVE_BASE': datetime.datetime.utcnow()})
-            if dt:
-                offset = (dt.date() - datetime.datetime.utcnow().date()).days
-        events = list_events_for_day(offset)
-        save_calendar_events(events)
-        if not events:
-            reply = 'No calendar events today.' if offset == 0 else 'No calendar events.'
-        else:
-            lines = [f"{e['start']} {e['title']}" for e in events]
-            reply = '\n'.join(lines)
+            reply = plan_then_answer(query)
     elif any(k in q for k in ONEDRIVE_KEYWORDS):
         if 'list' in q and 'word' in q:
             docs = list_word_docs()
