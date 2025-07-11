@@ -136,16 +136,36 @@ def gpt(prompt: str) -> str:
     return out.decode().strip()
 
 
+def _analysis_loop(prompt: str, plan: str, rounds: int = 3) -> str:
+    """Run a brief recurring analysis loop to refine the plan."""
+    notes: list[str] = []
+    for _ in range(rounds):
+        context = "\n".join(notes)
+        step = gpt(
+            "You are analyzing the user's request. "
+            "Consider the plan and any notes so far, then provide a short "
+            "update in 1-3 sentences. If you are satisfied with the reasoning, "
+            "start your reply with 'DONE:'.\n\n" +
+            f"Plan:\n{plan}\n\nNotes:\n{context}\n\nQuestion: {prompt}"
+        )
+        notes.append(step)
+        if step.strip().upper().startswith("DONE:"):
+            break
+    return "\n".join(notes)
+
+
 def plan_then_answer(prompt: str) -> str:
-    """Generate a short bullet plan then answer using that plan."""
+    """Generate a short bullet plan, analyze it in a loop, then answer."""
     plan = gpt(
         "Break down the following request into 2-4 short bullet steps. "
         "Only return the bullet list.\n" + prompt
     )
+    analysis = _analysis_loop(prompt, plan)
     answer = gpt(
-        "Using the plan below, provide the final answer.\n\nPlan:\n" + plan + f"\n\nQuestion: {prompt}"
+        "Using the plan and notes below, provide the final answer.\n\n"
+        f"Plan:\n{plan}\n\nNotes:\n{analysis}\n\nQuestion: {prompt}"
     )
-    return plan + "\n\n" + answer
+    return plan + "\n\n" + analysis + "\n\n" + answer
 
 
 def _extract_minutes(text: str) -> Optional[int]:
