@@ -4,6 +4,7 @@ import datetime
 from typing import Optional
 import requests
 import openai
+import json
 from dotenv import load_dotenv
 from config import load_config, get_api_key, get_llm, get_prompt
 
@@ -51,6 +52,34 @@ def chat_completion(model: str, messages: list[dict]) -> str:
 
 def _get_config():
     return load_config()
+
+
+def plan_actions(user_prompt: str) -> list[dict]:
+    planning_prompt = f"""You are an AI planner. Based on the user's input, decide which tools to use. Output a JSON list.
+
+User prompt:
+{user_prompt}
+
+Example response:
+[
+  {{ "type": "search_email", "query": "abfas" }},
+  {{ "type": "get_calendar", "date": "2025-07-10" }}
+]
+"""
+
+    messages = [
+        {"role": "system", "content": "You're a tool planning assistant."},
+        {"role": "user", "content": planning_prompt},
+    ]
+
+    import openai
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=messages,
+        temperature=0,
+    )
+
+    return json.loads(response["choices"][0]["message"]["content"])
 
 ONEDRIVE_KEYWORDS = {'onedrive', 'search', 'summarize', 'find', 'list'}
 EMAIL_KEYWORDS = {'gmail', 'email', 'inbox', 'mail'}
