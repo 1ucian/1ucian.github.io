@@ -6,9 +6,11 @@ from flask import Flask
 from dotenv import load_dotenv
 
 from server_common import register_common, WEB_DIR
+from memory_db import init_db
 
 
 load_dotenv()
+init_db()
 
 # Serve files from the shared web directory.  ``static_url_path`` is set to
 # ``''`` so URLs match ``/index.html`` rather than ``/static/index.html``.

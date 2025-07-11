@@ -9,9 +9,11 @@ from imessage_reader import read_latest_imessage
 from onedrive_reader import list_recent_files
 from send_imessage import send_imessage
 from summarizer import summarize_text
-from memory_db import save_message, get_recent_messages
+from memory_db import init_db, save_message, get_recent_messages
 
 OUTPUT_FILE = '/tmp/insight_output.txt'
+
+init_db()
 
 def main(prompt: str = "Summarize recent activity."):
     print("Planning...")

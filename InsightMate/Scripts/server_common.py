@@ -16,10 +16,16 @@ def index():
 
 @common_bp.route('/chat', methods=['POST'])
 def chat_route():
-    data = request.get_json() or {}
-    message = data.get('message') or data.get('query') or ''
-    reply = route(message)
-    return jsonify({'reply': reply})
+    """Process a chat message and return the assistant's reply as JSON."""
+    try:
+        data = request.get_json() or {}
+        message = data.get('message') or data.get('query') or ''
+        reply = route(message)
+        return jsonify({'reply': reply})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 @common_bp.route('/reminders', methods=['GET'])
 def reminders_route():
