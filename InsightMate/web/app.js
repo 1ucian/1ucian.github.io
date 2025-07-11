@@ -12,21 +12,22 @@ const settingsModal = new bootstrap.Modal(document.getElementById('settings-moda
 const themeSelect = document.getElementById('theme-select');
 const modelSelect = document.getElementById('model-select');
 
-const TYPE_DELAY = 8; // ms per character
 
 function processThought(text, durationSec) {
   const start = text.indexOf('Thinking...');
   const end = text.indexOf('...done thinking');
   if (start !== -1 && end !== -1 && end > start) {
     const thought = text.slice(start + 11, end).trim();
-    const rest = text.slice(end + 16).trim();
+    let restStart = end + 16;
+    if (text[restStart] === '.') restStart += 1;
+    const rest = text.slice(restStart).trim();
     const summary = `Thought for ${durationSec.toFixed(1)} seconds`;
     return `<details><summary>${summary}</summary>\n${thought}\n</details>\n\n${rest}`;
   }
   return text;
 }
 
-function addMessage(sender, text, typing = false) {
+function addMessage(sender, text) {
   const div = document.createElement('div');
   div.classList.add('message', sender === 'You' ? 'you' : 'assistant');
   const span = document.createElement('span');
@@ -34,28 +35,10 @@ function addMessage(sender, text, typing = false) {
   div.appendChild(span);
   messagesDiv.appendChild(div);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  if (typing) {
-    let i = 0;
-    const type = () => {
-      if (i < text.length) {
-        span.textContent += text[i];
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        i++;
-        setTimeout(type, TYPE_DELAY);
-      } else {
-        span.innerHTML = marked.parse(text);
-        const log = JSON.parse(localStorage.getItem('chatlog') || '[]');
-        log.push({sender, text});
-        localStorage.setItem('chatlog', JSON.stringify(log));
-      }
-    };
-    type();
-  } else {
-    span.innerHTML = marked.parse(text);
-    const log = JSON.parse(localStorage.getItem('chatlog') || '[]');
-    log.push({sender, text});
-    localStorage.setItem('chatlog', JSON.stringify(log));
-  }
+  span.innerHTML = marked.parse(text);
+  const log = JSON.parse(localStorage.getItem('chatlog') || '[]');
+  log.push({sender, text});
+  localStorage.setItem('chatlog', JSON.stringify(log));
   return div;
 }
 
@@ -114,7 +97,7 @@ function sendMessage() {
   if (!text) return;
   addMessage('You', text);
   input.value = '';
-  const placeholder = addMessage('Assistant', '...', false);
+  const placeholder = addMessage('Assistant', '...');
   const start = Date.now();
   fetch('/chat', {
     method: 'POST',
@@ -126,7 +109,7 @@ function sendMessage() {
     messagesDiv.removeChild(placeholder);
     const duration = (Date.now() - start) / 1000;
     const msg = processThought(data.reply, duration);
-    addMessage('Assistant', msg, true);
+    addMessage('Assistant', msg);
   })
   .catch(err => {
     messagesDiv.removeChild(placeholder);
