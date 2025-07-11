@@ -20,11 +20,11 @@ queries to it. If you see connection errors, the server may have failed to
 start. Check `Scripts/chat_server.log` for any errors.
 
 Copy `.env.example` to `.env`. Set `OPENAI_API_KEY` only if you want to use
-GPT‑4o, GPT‑4, **o4-mini** or **o4-mini-high**; leaving it blank will route chat requests to the local Llama 3 model via
+GPT‑4o, GPT‑4, **o4-mini** or **o4-mini-high**; leaving it blank will route chat requests to the local Qwen3 model via
 [Ollama](https://ollama.ai/).
 
-`windows_setup.ps1` will automatically download the Llama 3 model with
-`ollama pull llama3` as long as Ollama is installed.
+`windows_setup.ps1` will automatically download the Qwen3 model with
+`ollama pull qwen3:30b-a3b` as long as Ollama is installed.
 
 Place your Google API `credentials.json` in this directory and run
 `python gmail_reader.py` once to authorize Gmail and Calendar access. The

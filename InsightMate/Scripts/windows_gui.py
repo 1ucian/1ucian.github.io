@@ -188,7 +188,7 @@ class ChatGUI:
         win = tk.Toplevel(self.root)
         win.title('Settings')
         api_var = tk.StringVar(value=self.config.get('api_key', ''))
-        llm_var = tk.StringVar(value=self.config.get('llm', 'llama3'))
+        llm_var = tk.StringVar(value=self.config.get('llm', 'qwen3:30b-a3b'))
         theme_var = tk.StringVar(value=self.config.get('theme', 'dark'))
 
         tk.Label(win, text='OpenAI API Key:').grid(row=0, column=0, sticky='w')
@@ -197,7 +197,7 @@ class ChatGUI:
 
         tk.Label(win, text='LLM:').grid(row=1, column=0, sticky='w')
         llm_box = ttk.Combobox(win, textvariable=llm_var,
-                               values=['gpt-4o', 'gpt-4', 'o4-mini', 'o4-mini-high', 'llama3'],
+                               values=['gpt-4o', 'gpt-4', 'o4-mini', 'o4-mini-high', 'qwen3:30b-a3b'],
                                state='readonly')
         llm_box.grid(row=1, column=1, padx=5, pady=5)
 

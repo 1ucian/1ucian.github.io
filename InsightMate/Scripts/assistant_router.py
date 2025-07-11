@@ -62,7 +62,7 @@ def gpt(prompt: str) -> str:
         else:
             model = llm
         return chat_completion(model, messages)
-    model = llm if llm else "llama3"
+    model = llm if llm else "qwen3:30b-a3b"
     text = "\n".join(
         f"{m['role'].capitalize()}: {m['content']}" for m in messages
     )
