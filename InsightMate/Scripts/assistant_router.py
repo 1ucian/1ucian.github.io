@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from config import load_config, get_api_key, get_llm, get_prompt
 
 from onedrive_reader import search, list_word_docs
-from gmail_reader import fetch_unread_email, search_emails
+from gmail_reader import fetch_unread_email, search_emails, send_email
 from calendar_reader import (
     list_today_events,
     list_events_for_day,
@@ -49,8 +49,13 @@ def _get_config():
 ONEDRIVE_KEYWORDS = {'onedrive', 'search', 'summarize', 'find', 'list'}
 EMAIL_KEYWORDS = {'gmail', 'email', 'inbox', 'mail'}
 CALENDAR_KEYWORDS = {'calendar', 'event', 'schedule'}
-SEARCH_EMAIL_PREFIXES = ('search email', 'find email', 'search emails', 'find emails')
-SEARCH_EVENT_PREFIXES = ('search calendar', 'search event', 'find event', 'find events')
+SEARCH_EMAIL_PREFIXES = (
+    'search email', 'find email', 'search emails', 'find emails'
+)
+SEARCH_EVENT_PREFIXES = (
+    'search calendar', 'search event', 'find event', 'find events'
+)
+SEND_EMAIL_PREFIXES = ('send email', 'email to', 'compose email')
 
 
 def gpt(prompt: str) -> str:
@@ -126,6 +131,26 @@ def route(query: str) -> str:
             else:
                 lines = [f"{e['start']} {e['title']}" for e in events]
                 reply = '\n'.join(lines)
+    elif any(q.startswith(p) for p in SEND_EMAIL_PREFIXES):
+        parts = query.split(' ', 3)
+        if len(parts) < 4:
+            reply = 'Usage: send email <address> <subject> <message>'
+        else:
+            addr = parts[2]
+            subject_body = parts[3]
+            if '"' in subject_body:
+                try:
+                    subject, body = subject_body.split('"', 2)[1::2]
+                except ValueError:
+                    reply = 'Usage: send email <address> "<subject>" <message>'
+                    subject = body = None
+            else:
+                sub_parts = subject_body.split(' ', 1)
+                subject = sub_parts[0]
+                body = sub_parts[1] if len(sub_parts) > 1 else ''
+            if subject is not None:
+                send_email(addr, subject, body)
+                reply = 'Email sent.'
     elif q.startswith('add event') or q.startswith('create event') or q.startswith('new event'):
         reply = create_event(query)
     elif any(k in q for k in EMAIL_KEYWORDS):

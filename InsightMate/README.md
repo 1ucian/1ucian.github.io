@@ -45,3 +45,6 @@ respond with awareness of previous messages. The desktop UI includes a
 **Memory** column to review recent messages along with sections for reminders
 and scheduled tasks.
 
+Use `send email <address> <subject> <message>` in the chat window to compose and
+send a Gmail message from your account.
+
