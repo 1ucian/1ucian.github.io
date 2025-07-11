@@ -2,6 +2,7 @@ import os
 import subprocess
 import datetime
 from typing import Optional
+import requests
 import openai
 from dotenv import load_dotenv
 from config import load_config, get_api_key, get_llm, get_prompt
@@ -57,6 +58,49 @@ SEARCH_EVENT_PREFIXES = (
 )
 SEND_EMAIL_PREFIXES = ('send email', 'email to', 'compose email')
 
+# Track email composition across multiple turns
+PENDING_EMAIL: dict[str, str | None] = {
+    'step': None,
+    'address': None,
+    'subject': None,
+    'body': None,
+}
+
+# Pending calendar event details
+PENDING_EVENT: dict[str, str | None] = {
+    'step': None,
+    'title': None,
+    'time': None,
+}
+
+
+def _get_location() -> str:
+    lat = os.getenv('LATITUDE')
+    lon = os.getenv('LONGITUDE')
+    if lat and lon:
+        return f'{lat}, {lon}'
+    try:
+        resp = requests.get('https://ipapi.co/json', timeout=5)
+        data = resp.json()
+        city = data.get('city', '')
+        region = data.get('region', '')
+        country = data.get('country_name', '')
+        coords = f"{data.get('latitude')},{data.get('longitude')}" if data.get('latitude') and data.get('longitude') else ''
+        loc = ', '.join(filter(None, [city, region, country]))
+        return f"{loc} ({coords})" if coords else loc
+    except Exception:
+        return 'Location not available.'
+
+
+def _run_python(code: str) -> str:
+    try:
+        out = subprocess.check_output(['python', '-c', code], stderr=subprocess.STDOUT, timeout=10)
+        return out.decode().strip() or 'Done.'
+    except subprocess.CalledProcessError as e:
+        return e.output.decode().strip()
+    except Exception as e:
+        return str(e)
+
 
 def gpt(prompt: str) -> str:
     cfg = _get_config()
@@ -104,6 +148,39 @@ def route(query: str) -> str:
     save_message('user', query)
     q = query.lower()
     reply = ''
+    global PENDING_EMAIL, PENDING_EVENT
+
+    if PENDING_EMAIL['step']:
+        if PENDING_EMAIL['step'] == 'address':
+            PENDING_EMAIL['address'] = query.strip()
+            PENDING_EMAIL['step'] = 'subject'
+            reply = 'What is the subject?'
+            save_message('assistant', reply)
+            return reply
+        if PENDING_EMAIL['step'] == 'subject':
+            PENDING_EMAIL['subject'] = query.strip()
+            PENDING_EMAIL['step'] = 'body'
+            reply = 'What should the email say?'
+            save_message('assistant', reply)
+            return reply
+        if PENDING_EMAIL['step'] == 'body':
+            PENDING_EMAIL['body'] = query.strip()
+            send_email(PENDING_EMAIL['address'], PENDING_EMAIL['subject'], PENDING_EMAIL['body'])
+            reply = 'Email sent.'
+            PENDING_EMAIL = {'step': None, 'address': None, 'subject': None, 'body': None}
+            save_message('assistant', reply)
+            return reply
+    if PENDING_EVENT['step']:
+        if PENDING_EVENT['step'] == 'time':
+            text = f"add event {PENDING_EVENT['title']} {query}" if PENDING_EVENT['title'] else f"add event {query}"
+            reply = create_event(text)
+            if reply == 'Could not parse time.':
+                reply = 'Sorry, I could not understand the time. Please try again.'
+                save_message('assistant', reply)
+                return reply
+            PENDING_EVENT = {'step': None, 'title': None, 'time': None}
+            save_message('assistant', reply)
+            return reply
     if any(q.startswith(p) for p in SEARCH_EMAIL_PREFIXES):
         parts = query.split(' ', 2)
         if len(parts) < 3:
@@ -133,8 +210,17 @@ def route(query: str) -> str:
                 reply = '\n'.join(lines)
     elif any(q.startswith(p) for p in SEND_EMAIL_PREFIXES):
         parts = query.split(' ', 3)
-        if len(parts) < 4:
-            reply = 'Usage: send email <address> <subject> <message>'
+        if len(parts) < 2:
+            PENDING_EMAIL = {'step': 'address', 'address': None, 'subject': None, 'body': None}
+            reply = 'Who is the recipient?'
+        elif len(parts) < 4:
+            addr = parts[2] if len(parts) > 2 else None
+            PENDING_EMAIL = {'step': 'subject', 'address': addr, 'subject': None, 'body': None}
+            if addr is None:
+                PENDING_EMAIL['step'] = 'address'
+                reply = 'Who is the recipient?'
+            else:
+                reply = 'What is the subject?'
         else:
             addr = parts[2]
             subject_body = parts[3]
@@ -153,6 +239,14 @@ def route(query: str) -> str:
                 reply = 'Email sent.'
     elif q.startswith('add event') or q.startswith('create event') or q.startswith('new event'):
         reply = create_event(query)
+        if reply == 'Could not parse time.':
+            title = query
+            for p in ('add event', 'create event', 'new event'):
+                if title.lower().startswith(p):
+                    title = title[len(p):].strip()
+                    break
+            PENDING_EVENT = {'step': 'time', 'title': title, 'time': None}
+            reply = 'When should this event occur?'
     elif any(k in q for k in EMAIL_KEYWORDS):
         email = fetch_unread_email()
         save_email(email)
@@ -234,9 +328,17 @@ def route(query: str) -> str:
         else:
             lines = [f"{m[0]} {m[1]}: {m[2]}" for m in mem]
             reply = '\n'.join(lines)
+    elif 'where am i' in q or 'my location' in q or q.startswith('location'):
+        reply = _get_location()
     elif 'current time' in q or q.startswith('what time') or q == 'time':
         now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         reply = f'The current time is {now}'
+    elif q.startswith('run python'):
+        code = query[len('run python'):].strip()
+        if not code:
+            reply = 'Please provide Python code to run.'
+        else:
+            reply = _run_python(code)
     elif 'open' in q or 'launch' in q or 'play' in q:
         reply = execute_action(query)
     else:
