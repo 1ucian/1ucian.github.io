@@ -39,6 +39,7 @@ from memory_db import (
     get_recent_messages,
 )
 from summarizer import summarize_text
+from llm_client import chat_completion
 
 last_tool_output = {}
 
@@ -62,46 +63,6 @@ TOOL_REGISTRY = {
 load_dotenv()
 
 
-def chat_completion(model: str, messages: list[dict]) -> str:
-    """Use OpenAI (non-streaming) or stream from local Ollama (e.g. Qwen 30B A3b)."""
-
-    if model.startswith("gpt-"):
-        # OpenAI fallback
-        import openai
-        return openai.ChatCompletion.create(
-            model=model,
-            messages=messages
-        )["choices"][0]["message"]["content"].strip()
-
-    # Stream from Ollama local model
-    response = requests.post(
-        "http://localhost:11434/api/chat",
-        json={
-            "model": model,
-            "messages": messages,
-            "stream": True
-        },
-        stream=True
-    )
-    response.raise_for_status()
-
-    full_reply = ""
-    for line in response.iter_lines():
-        if not line:
-            continue
-        if line.startswith(b'data: '):
-            line = line[6:]
-        try:
-            chunk = line.decode("utf-8").strip()
-            if chunk == "[DONE]":
-                break
-            content = requests.utils.json.loads(chunk).get("message", {}).get("content", "")
-            full_reply += content
-        except Exception as e:
-            full_reply += f"\n\u26a0\ufe0f Stream decode error: {e}"
-            break
-
-    return full_reply.strip()
 
 def _get_config():
     return load_config()

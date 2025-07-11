@@ -1,4 +1,4 @@
-from assistant_router import gpt
+from llm_client import gpt
 
 
 def summarize_text(text: str) -> str:
