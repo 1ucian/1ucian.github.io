@@ -28,5 +28,17 @@ timezone.
 
 See [InsightMate/README.md](InsightMate/README.md) for more details.
 
+## Web interface
+
+To start the chat server directly, run:
+
+```bash
+python Scripts/chat_server.py
+```
+
+Then open `http://<host>:5000/` in your browser (replace `<host>` with your
+computer's address). The server listens on all network interfaces so it can be
+reached from other devices on the same network.
+
 ## MCP Integration
 InsightMate leverages the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) platform to centralize configuration and neatly integrate all components.

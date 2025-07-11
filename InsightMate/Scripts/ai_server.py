@@ -3,9 +3,7 @@ from flask import Flask, request, jsonify
 import openai
 from dotenv import load_dotenv
 
-from server_common import register_common, WEB_DIR
 
-app = Flask(__name__, static_folder=WEB_DIR, static_url_path='')
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -42,6 +40,4 @@ def process():
     return jsonify({'reply': reply})
 
 
-if __name__ == '__main__':
-    app.run(port=5000)
 
