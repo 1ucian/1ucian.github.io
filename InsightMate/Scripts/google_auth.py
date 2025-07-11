@@ -6,6 +6,7 @@ from google.auth.transport.requests import Request
 
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/gmail.send',
     # Allow reading and writing calendar events
     'https://www.googleapis.com/auth/calendar',
 ]

@@ -1,6 +1,8 @@
 from __future__ import print_function
 from email.header import decode_header, make_header
+from email.mime.text import MIMEText
 from googleapiclient.discovery import build
+import base64
 
 from google_auth import get_credentials
 
@@ -18,6 +20,18 @@ def fetch_unread_email():
     subject = headers.get('Subject', '')
     snippet = msg.get('snippet', '')[:250]
     return {'from': sender, 'subject': subject, 'snippet': snippet}
+
+
+def send_email(to: str, subject: str, body: str) -> str:
+    """Send an email using the user's Gmail account."""
+    creds = get_credentials()
+    service = build('gmail', 'v1', credentials=creds)
+    msg = MIMEText(body)
+    msg['to'] = to
+    msg['subject'] = subject
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+    service.users().messages().send(userId='me', body={'raw': raw}).execute()
+    return 'Email sent.'
 
 
 if __name__ == '__main__':
