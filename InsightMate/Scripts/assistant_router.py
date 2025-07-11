@@ -1,5 +1,6 @@
 import os
 import subprocess
+import datetime
 from typing import Optional
 import openai
 from dotenv import load_dotenv
@@ -7,7 +8,8 @@ from config import load_config, get_api_key, get_llm, get_prompt
 
 from onedrive_reader import search, list_word_docs
 from gmail_reader import fetch_unread_email, search_emails
-from calendar_reader import list_today_events, search_events
+from calendar_reader import list_today_events, list_events_for_day, search_events
+from dateparser import parse as parse_date
 from reminder_scheduler import (
     schedule as schedule_reminder,
     schedule_air_quality,
@@ -127,10 +129,19 @@ def route(query: str) -> str:
         else:
             reply = f"From {email['from']}: {email['subject']} - {email['snippet']}"
     elif any(k in q for k in CALENDAR_KEYWORDS):
-        events = list_today_events()
+        offset = 0
+        if 'yesterday' in q:
+            offset = -1
+        elif 'tomorrow' in q:
+            offset = 1
+        else:
+            dt = parse_date(query, settings={'RELATIVE_BASE': datetime.datetime.utcnow()})
+            if dt:
+                offset = (dt.date() - datetime.datetime.utcnow().date()).days
+        events = list_events_for_day(offset)
         save_calendar_events(events)
         if not events:
-            reply = 'No calendar events today.'
+            reply = 'No calendar events today.' if offset == 0 else 'No calendar events.'
         else:
             lines = [f"{e['start']} {e['title']}" for e in events]
             reply = '\n'.join(lines)
