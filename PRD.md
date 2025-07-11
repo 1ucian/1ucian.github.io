@@ -8,6 +8,9 @@ InsightMate is a cross-platform personal assistant bundled within this repositor
 - Offer flexible language model choices (OpenAI API or local Llama 3 via Ollama).
 - Allow quick interaction through an always‑on UI with optional voice input and system tray control.
 - Maintain compatibility with the Model Context Protocol (MCP) standard to simplify future integrations.
+- Handle complex requests with multi-step thinking and processing so the assistant can plan before answering.
+  This is implemented via a new `plan_then_answer()` helper that first asks the model to outline
+  bullet steps before producing the final reply.
 
 ## Current Features
 - **Python backend** with Flask `chat_server.py` for routing assistant queries and scheduling reminders.
@@ -18,6 +21,7 @@ InsightMate is a cross-platform personal assistant bundled within this repositor
 - **Email and calendar search** so the assistant can `search email` or `search calendar` for specific information on demand.
 - **Sending email** via the `send email` command to compose and dispatch Gmail messages.
 - **Reading full emails** with `read email <keywords>` to retrieve the full message body.
+- **Multi-step reasoning** that outlines short bullet steps before performing complex actions using the `plan_then_answer()` helper.
 
 ## Use Cases
 1. Quickly query recent email or calendar events while chatting with GPT‑4o.

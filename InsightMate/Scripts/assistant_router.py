@@ -136,6 +136,18 @@ def gpt(prompt: str) -> str:
     return out.decode().strip()
 
 
+def plan_then_answer(prompt: str) -> str:
+    """Generate a short bullet plan then answer using that plan."""
+    plan = gpt(
+        "Break down the following request into 2-4 short bullet steps. "
+        "Only return the bullet list.\n" + prompt
+    )
+    answer = gpt(
+        "Using the plan below, provide the final answer.\n\nPlan:\n" + plan + f"\n\nQuestion: {prompt}"
+    )
+    return plan + "\n\n" + answer
+
+
 def _extract_minutes(text: str) -> Optional[int]:
     import re
     match = re.search(r'(\d+)\s*(minute|hour)', text)
@@ -361,6 +373,6 @@ def route(query: str) -> str:
     elif 'open' in q or 'launch' in q or 'play' in q:
         reply = execute_action(query)
     else:
-        reply = gpt(query)
+        reply = plan_then_answer(query)
     save_message('assistant', reply)
     return reply
