@@ -234,6 +234,9 @@ def route(query: str) -> str:
         else:
             lines = [f"{m[0]} {m[1]}: {m[2]}" for m in mem]
             reply = '\n'.join(lines)
+    elif 'current time' in q or q.startswith('what time') or q == 'time':
+        now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        reply = f'The current time is {now}'
     elif 'open' in q or 'launch' in q or 'play' in q:
         reply = execute_action(query)
     else:

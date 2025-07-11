@@ -2,6 +2,9 @@ const messagesDiv = document.getElementById('messages');
 const reminderDiv = document.getElementById('reminder-list');
 const taskDiv = document.getElementById('task-list');
 const memoryDiv = document.getElementById('memory-list');
+const reminderToggle = document.getElementById('reminder-toggle');
+const taskToggle = document.getElementById('task-toggle');
+const memoryToggle = document.getElementById('memory-toggle');
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('send-btn');
 const settingsBtn = document.getElementById('settings-btn');
@@ -9,15 +12,37 @@ const settingsModal = new bootstrap.Modal(document.getElementById('settings-moda
 const themeSelect = document.getElementById('theme-select');
 const modelSelect = document.getElementById('model-select');
 
-function addMessage(sender, text) {
+function addMessage(sender, text, typing = false) {
   const div = document.createElement('div');
   div.classList.add('message', sender === 'You' ? 'you' : 'assistant');
-  div.innerHTML = `<strong>${sender}:</strong> ` + marked.parse(text);
+  const span = document.createElement('span');
+  div.innerHTML = `<strong>${sender}:</strong> `;
+  div.appendChild(span);
   messagesDiv.appendChild(div);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  const log = JSON.parse(localStorage.getItem('chatlog') || '[]');
-  log.push({sender, text});
-  localStorage.setItem('chatlog', JSON.stringify(log));
+  if (typing) {
+    let i = 0;
+    const type = () => {
+      if (i < text.length) {
+        span.textContent += text[i];
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        i++;
+        setTimeout(type, 20);
+      } else {
+        span.innerHTML = marked.parse(text);
+        const log = JSON.parse(localStorage.getItem('chatlog') || '[]');
+        log.push({sender, text});
+        localStorage.setItem('chatlog', JSON.stringify(log));
+      }
+    };
+    type();
+  } else {
+    span.innerHTML = marked.parse(text);
+    const log = JSON.parse(localStorage.getItem('chatlog') || '[]');
+    log.push({sender, text});
+    localStorage.setItem('chatlog', JSON.stringify(log));
+  }
+  return div;
 }
 
 function renderList(container, items, formatter) {
@@ -46,6 +71,16 @@ function applyTheme(theme) {
   document.body.classList.toggle('light', theme === 'light');
 }
 
+reminderToggle.addEventListener('click', () => {
+  reminderDiv.classList.toggle('d-none');
+});
+taskToggle.addEventListener('click', () => {
+  taskDiv.classList.toggle('d-none');
+});
+memoryToggle.addEventListener('click', () => {
+  memoryDiv.classList.toggle('d-none');
+});
+
 function loadSettings() {
   const theme = localStorage.getItem('theme') || 'dark';
   const model = localStorage.getItem('model') || 'gpt-4o';
@@ -65,14 +100,21 @@ function sendMessage() {
   if (!text) return;
   addMessage('You', text);
   input.value = '';
+  const placeholder = addMessage('Assistant', '...', false);
   fetch('/chat', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({query: text, model: localStorage.getItem('model') || 'gpt-4o'})
   })
   .then(res => res.json())
-  .then(data => addMessage('Assistant', data.reply))
-  .catch(err => addMessage('Error', err.toString()))
+  .then(data => {
+    messagesDiv.removeChild(placeholder);
+    addMessage('Assistant', data.reply, true);
+  })
+  .catch(err => {
+    messagesDiv.removeChild(placeholder);
+    addMessage('Error', err.toString());
+  })
   .finally(fetchData);
 }
 
