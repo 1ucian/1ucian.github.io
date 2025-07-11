@@ -40,6 +40,7 @@ from memory_db import (
 )
 from summarizer import summarize_text
 from llm_client import chat_completion
+from user_settings import get_selected_model
 
 last_tool_output = {}
 
@@ -68,7 +69,7 @@ def _get_config():
     return load_config()
 
 
-def plan_actions(user_prompt: str) -> list[dict]:
+def plan_actions(user_prompt: str, model: str) -> list[dict]:
     reasoning_mode = False
     if "explain" in user_prompt.lower() or "how did you decide" in user_prompt.lower():
         reasoning_mode = True
@@ -92,14 +93,9 @@ Example response:
     if reasoning_mode:
         messages.insert(0, {"role": "system", "content": "Think step by step and explain what you are doing and why."})
 
-    import openai
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=messages,
-        temperature=0,
-    )
+    response = chat_completion(model, messages)
 
-    return json.loads(response["choices"][0]["message"]["content"])
+    return json.loads(response)
 
 ONEDRIVE_KEYWORDS = {'onedrive', 'search', 'summarize', 'find', 'list'}
 EMAIL_KEYWORDS = {'gmail', 'email', 'inbox', 'mail'}
@@ -185,10 +181,10 @@ def _needs_calendar_events(query: str) -> bool:
     return any(t in q for t in triggers)
 
 
-def gpt(prompt: str, cot_mode: bool = False) -> str:
-    """Return an LLM reply using the configured model."""
+def gpt(prompt: str, model: str | None = None, cot_mode: bool = False) -> str:
+    """Return an LLM reply using ``model`` or the configured default."""
     cfg = _get_config()
-    llm = get_llm(cfg).lower()
+    llm = (model or get_llm(cfg)).lower()
     api_key = get_api_key(cfg)
     if cot_mode:
         system_prompt = (
@@ -209,21 +205,21 @@ def gpt(prompt: str, cot_mode: bool = False) -> str:
             return "OpenAI API key missing."
         openai.api_key = api_key
         if llm == "gpt-4o":
-            model = "gpt-4o"
+            llm_name = "gpt-4o"
         elif llm == "gpt-4":
-            model = "gpt-4"
+            llm_name = "gpt-4"
         else:
-            model = llm
-        return chat_completion(model, messages)
-    model = llm if llm else "qwen3:30b-a3b"
+            llm_name = llm
+        return chat_completion(llm_name, messages)
+    llm_name = llm if llm else "qwen3:30b-a3b"
     text = "\n".join(
         f"{m['role'].capitalize()}: {m['content']}" for m in messages
     )
-    out = subprocess.check_output(["ollama", "run", model, text])
+    out = subprocess.check_output(["ollama", "run", llm_name, text])
     return out.decode().strip()
 
 
-def _analysis_loop(prompt: str, plan: str, rounds: int = 3) -> str:
+def _analysis_loop(prompt: str, plan: str, rounds: int = 3, model: str | None = None) -> str:
     """Run a brief recurring analysis loop to refine the plan."""
     notes: list[str] = []
     for _ in range(rounds):
@@ -233,7 +229,8 @@ def _analysis_loop(prompt: str, plan: str, rounds: int = 3) -> str:
             "Consider the plan and any notes so far, then provide a short "
             "update in 1-3 sentences. If you are satisfied with the reasoning, "
             "start your reply with 'DONE:'.\n\n" +
-            f"Plan:\n{plan}\n\nNotes:\n{context}\n\nQuestion: {prompt}"
+            f"Plan:\n{plan}\n\nNotes:\n{context}\n\nQuestion: {prompt}",
+            model=model
         )
         notes.append(step)
         if step.strip().upper().startswith("DONE:"):
@@ -250,16 +247,18 @@ def generate_response(user_prompt: str, data: dict, cot_mode: bool) -> str:
     return gpt(prompt, cot_mode=cot_mode)
 
 
+
 def plan_then_answer(user_prompt: str):
+    selected_model = get_selected_model()
     prompt_clean = user_prompt.lower().strip()
 
     # Handle small talk or casual prompts
     if prompt_clean in ["hi", "hello", "hey", "how are you", "yo", "what's up", "sup", "good morning", "good evening"]:
-        return chat_completion("gpt-4", [{"role": "user", "content": user_prompt}])
+        return chat_completion(selected_model, [{"role": "user", "content": user_prompt}])
 
     # Attempt to plan actions
     try:
-        actions = plan_actions(user_prompt)
+        actions = plan_actions(user_prompt, selected_model)
     except Exception as e:
         return "\u26a0\ufe0f Planning failed: " + str(e)
 
@@ -313,6 +312,7 @@ def _extract_minutes(text: str) -> Optional[int]:
 
 
 def route(query: str) -> str:
+    selected_model = get_selected_model()
     cot_mode = False
     q = query.lower()
     if "/think" in q:

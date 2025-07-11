@@ -2,7 +2,8 @@ import requests
 import openai
 
 
-def gpt(prompt: str, model: str = "qwen:30b-a3b") -> str:
+def gpt(prompt: str, model: str) -> str:
+    """Return a chat completion for ``prompt`` using ``model``."""
     return chat_completion(model, [{"role": "user", "content": prompt}])
 
 
