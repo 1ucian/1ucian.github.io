@@ -36,7 +36,7 @@ def tasks_route():
 @common_bp.route('/memory', methods=['GET'])
 def memory_route():
     messages = get_recent_messages()
-    data = [{'ts': m[0], 'sender': m[1], 'text': m[2]} for m in messages]
+    data = [{'user': m['user'], 'assistant': m['assistant']} for m in messages]
     return jsonify({'messages': data})
 
 

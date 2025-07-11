@@ -1,6 +1,6 @@
 import json
-import os
-import requests
+import openai
+from dateparser import parse as parse_date
 
 from assistant_router import plan_actions
 from gmail_reader import search_emails
@@ -8,8 +8,9 @@ from calendar_reader import list_events_for_day
 from imessage_reader import read_latest_imessage
 from onedrive_reader import list_recent_files
 from send_imessage import send_imessage
+from summarizer import summarize_text
+from memory_db import save_message, get_recent_messages
 
-SERVER_URL = 'http://localhost:5000/process'
 OUTPUT_FILE = '/tmp/insight_output.txt'
 
 def main(prompt: str = "Summarize recent activity."):
@@ -28,20 +29,35 @@ def main(prompt: str = "Summarize recent activity."):
         if action.get("type") == "search_email":
             data["email"] = search_emails(action.get("query", ""))
         elif action.get("type") == "get_calendar":
-            data["calendar"] = list_events_for_day(action.get("date", "today"))
+            date_str = action.get("date", "today")
+            parsed = parse_date(date_str)
+            if parsed:
+                iso_date = parsed.strftime("%Y-%m-%d")
+                data["calendar"] = list_events_for_day(iso_date)
         elif action.get("type") == "read_imessage":
             data["imessage"] = read_latest_imessage()
         elif action.get("type") == "list_drive":
             data["onedrive"] = list_recent_files()
+        elif action.get("type") == "summarize":
+            source = action.get("source")
+            if source and source in data:
+                data["summary"] = summarize_text(data[source])
 
-    payload = {"prompt": prompt, **data}
+    history = get_recent_messages()
+    messages = [{"role": "system", "content": "You are InsightMate, a smart assistant."}]
+    for mem in history:
+        messages.append({"role": "user", "content": mem["user"]})
+        messages.append({"role": "assistant", "content": mem["assistant"]})
+    messages.append({"role": "user", "content": prompt})
 
-    print('Sending to AI server...')
-    resp = requests.post(SERVER_URL, json=payload)
-    reply = resp.json().get('reply', '')
+    print('Contacting model...')
+    resp = openai.ChatCompletion.create(model="gpt-4", messages=messages)
+    reply = resp.choices[0].message.content.strip()
     print('AI reply:', reply)
     with open(OUTPUT_FILE, 'w') as f:
         f.write(reply)
+
+    save_message(prompt, reply)
 
     imsg_data = data.get('imessage')
     if imsg_data:
