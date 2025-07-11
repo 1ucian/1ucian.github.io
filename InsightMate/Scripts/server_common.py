@@ -3,7 +3,7 @@ from flask import Blueprint, jsonify, request, current_app
 
 from assistant_router import route
 from reminder_scheduler import list_reminders, list_tasks
-from memory_db import get_recent_messages
+from memory_db import get_recent_messages, clear_memory
 
 WEB_DIR = os.path.join(os.path.dirname(__file__), '..', 'web')
 
@@ -38,6 +38,12 @@ def memory_route():
     messages = get_recent_messages()
     data = [{'ts': m[0], 'sender': m[1], 'text': m[2]} for m in messages]
     return jsonify({'messages': data})
+
+
+@common_bp.route('/memory/reset', methods=['POST'])
+def memory_reset_route():
+    clear_memory()
+    return jsonify({'status': 'ok'})
 
 def register_common(app):
     """Register common routes and static file handling on the given app."""

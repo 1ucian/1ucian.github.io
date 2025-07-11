@@ -5,6 +5,7 @@ const memoryDiv = document.getElementById('memory-list');
 const reminderToggle = document.getElementById('reminder-toggle');
 const taskToggle = document.getElementById('task-toggle');
 const memoryToggle = document.getElementById('memory-toggle');
+const resetMemoryBtn = document.getElementById('reset-memory');
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('send-btn');
 const settingsBtn = document.getElementById('settings-btn');
@@ -77,6 +78,11 @@ taskToggle.addEventListener('click', () => {
 });
 memoryToggle.addEventListener('click', () => {
   memoryDiv.classList.toggle('d-none');
+});
+resetMemoryBtn.addEventListener('click', () => {
+  fetch('/memory/reset', {method: 'POST'})
+    .then(fetchData)
+    .catch(() => {});
 });
 
 function loadSettings() {
