@@ -1,5 +1,4 @@
 import json
-import openai
 from dateparser import parse as parse_date
 
 from assistant_router import plan_actions
@@ -53,8 +52,9 @@ def main(prompt: str = "Summarize recent activity."):
     messages.append({"role": "user", "content": prompt})
 
     print('Contacting model...')
-    resp = openai.ChatCompletion.create(model="gpt-4", messages=messages)
-    reply = resp.choices[0].message.content.strip()
+    from llm_client import chat_completion
+    from user_settings import get_selected_model
+    reply = chat_completion(get_selected_model(), messages)
     print('AI reply:', reply)
     with open(OUTPUT_FILE, 'w') as f:
         f.write(reply)

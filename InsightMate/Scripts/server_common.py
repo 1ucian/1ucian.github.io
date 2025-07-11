@@ -2,6 +2,7 @@ import os
 from flask import Blueprint, jsonify, request, current_app
 
 from assistant_router import route
+from user_settings import set_selected_model
 from reminder_scheduler import list_reminders, list_tasks
 from memory_db import get_recent_messages, clear_memory
 
@@ -20,6 +21,9 @@ def chat_route():
     try:
         data = request.get_json() or {}
         message = data.get('message') or data.get('query') or ''
+        model = data.get('model')
+        if model:
+            set_selected_model(model)
         reply = route(message)
         return jsonify({'reply': reply})
     except Exception as e:
