@@ -19,7 +19,6 @@ const logPath = path.join(require('os').homedir(), 'InsightMate', 'logs');
 if (!fs.existsSync(logPath)) fs.mkdirSync(logPath, { recursive: true });
 const logFile = path.join(logPath, 'chatlog.txt');
 
-const TYPE_DELAY = 8; // ms per character
 
 function processThought(text, durationSec) {
   const start = text.indexOf('Thinking...');
@@ -33,7 +32,7 @@ function processThought(text, durationSec) {
   return text;
 }
 
-function addMessage(sender, text, typing = false) {
+function addMessage(sender, text) {
   const div = document.createElement('div');
   div.classList.add('message', sender === 'You' ? 'you' : 'assistant');
   const span = document.createElement('span');
@@ -42,24 +41,8 @@ function addMessage(sender, text, typing = false) {
   messagesDiv.appendChild(div);
   messagesDiv.scrollTop = messagesDiv.scrollHeight;
   const logIt = () => fs.appendFileSync(logFile, `${sender}: ${text}\n`);
-  if (typing) {
-    let i = 0;
-    const type = () => {
-      if (i < text.length) {
-        span.textContent += text[i];
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        i++;
-        setTimeout(type, TYPE_DELAY);
-      } else {
-        span.innerHTML = marked.parse(text);
-        logIt();
-      }
-    };
-    type();
-  } else {
-    span.innerHTML = marked.parse(text);
-    logIt();
-  }
+  span.innerHTML = marked.parse(text);
+  logIt();
   return div;
 }
 
@@ -160,7 +143,6 @@ function sendMessage() {
   if (!text) return;
   addMessage('You', text);
   input.value = '';
-  const placeholder = addMessage('Assistant', '...', false);
   const start = Date.now();
   fetch('http://localhost:5000/chat', {
     method: 'POST',
@@ -169,13 +151,11 @@ function sendMessage() {
   })
     .then(res => res.json())
     .then(data => {
-      messagesDiv.removeChild(placeholder);
       const duration = (Date.now() - start) / 1000;
       const msg = processThought(data.reply, duration);
-      addMessage('Assistant', msg, true);
+      addMessage('Assistant', msg);
     })
     .catch(err => {
-      messagesDiv.removeChild(placeholder);
       addMessage('Error', err.toString());
     })
     .finally(fetchReminders);
