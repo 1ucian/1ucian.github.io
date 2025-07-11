@@ -8,6 +8,10 @@ const messagesDiv = document.getElementById('messages');
 const reminderDiv = document.getElementById('reminder-list');
 const taskDiv = document.getElementById('task-list');
 const memoryDiv = document.getElementById('memory-list');
+const settingsBtn = document.getElementById('settings-btn');
+const settingsModal = document.getElementById('settings-modal');
+const themeSelect = document.getElementById('theme-select');
+const modelSelect = document.getElementById('model-select');
 const logPath = path.join(require('os').homedir(), 'InsightMate', 'logs');
 if (!fs.existsSync(logPath)) fs.mkdirSync(logPath, { recursive: true });
 const logFile = path.join(logPath, 'chatlog.txt');
@@ -51,6 +55,29 @@ function renderMemory(items) {
   });
 }
 
+function applyTheme(theme) {
+  document.body.classList.toggle('light', theme === 'light');
+}
+
+function loadSettings() {
+  const theme = localStorage.getItem('theme') || 'dark';
+  const model = localStorage.getItem('model') || 'gpt-4o';
+  themeSelect.value = theme;
+  modelSelect.value = model;
+  applyTheme(theme);
+}
+
+settingsBtn.addEventListener('click', () => {
+  settingsModal.style.display = 'flex';
+});
+
+document.getElementById('save-settings').addEventListener('click', () => {
+  localStorage.setItem('theme', themeSelect.value);
+  localStorage.setItem('model', modelSelect.value);
+  applyTheme(themeSelect.value);
+  settingsModal.style.display = 'none';
+});
+
 function fetchReminders() {
   fetch('http://localhost:5000/reminders')
     .then(res => res.json())
@@ -88,7 +115,7 @@ function sendMessage() {
   fetch('http://localhost:5000/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: text })
+    body: JSON.stringify({ query: text, model: localStorage.getItem('model') || 'gpt-4o' })
   })
     .then(res => res.json())
     .then(data => addMessage('Assistant', data.reply))
@@ -96,4 +123,5 @@ function sendMessage() {
     .finally(fetchReminders);
 }
 
+loadSettings();
 fetchReminders();
