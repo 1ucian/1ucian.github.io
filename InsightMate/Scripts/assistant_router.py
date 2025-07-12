@@ -106,6 +106,8 @@ Examples:
     if not match:
         print("\u26a0\ufe0f No valid JSON block found in planner output")
         print("Raw model response:", response)
+        if response.strip().startswith("\u26a0\ufe0f"):
+            return [{"type": "chat", "prompt": response}]
         return [{"type": "chat", "prompt": "I'm not sure what to do. Can you clarify?"}]
 
     try:
@@ -229,12 +231,8 @@ def gpt(prompt: str, model: str | None = None, cot_mode: bool = False) -> str:
         else:
             llm_name = llm
         return chat_completion(llm_name, messages)
-    llm_name = llm if llm else "qwen3:30b-a3b"
-    text = "\n".join(
-        f"{m['role'].capitalize()}: {m['content']}" for m in messages
-    )
-    out = subprocess.check_output(["ollama", "run", llm_name, text])
-    return out.decode().strip()
+    llm_name = llm if llm else "qwen:30b-a3b"
+    return chat_completion(llm_name, messages)
 
 
 def _analysis_loop(prompt: str, plan: str, rounds: int = 3, model: str | None = None) -> str:

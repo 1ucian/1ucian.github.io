@@ -124,6 +124,13 @@ function sendMessage() {
   .then(res => res.json())
   .then(data => {
     const duration = (Date.now() - start) / 1000;
+    if (data.error) {
+      if (data.error.indexOf('Qwen API') > -1) {
+        alert('⚠️ InsightMate backend LLM is offline. Start Ollama with:  `ollama serve` ');
+      }
+      addMessage('Error', data.error);
+      return;
+    }
     const msg = processThought(data.reply, duration);
     addMessage('Assistant', msg);
   })

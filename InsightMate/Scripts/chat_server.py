@@ -23,10 +23,10 @@ register_common(app)
 
 
 if __name__ == "__main__":
-    from llm_client import BASE_URL
+    from llm_client import OLLAMA_URL
     try:
-        requests.get(BASE_URL)
+        requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
     except Exception:
-        print("\u26a0\ufe0f Ollama is not running. Start it with `ollama run qwen:30b`.")
+        print("\u26a0\ufe0f Ollama server not reachable. Start it with `ollama serve`." )
     # Listen on all interfaces so the web client can connect locally.
     app.run(host="0.0.0.0", port=5000)
