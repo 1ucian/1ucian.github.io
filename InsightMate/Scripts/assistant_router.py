@@ -111,6 +111,7 @@ Available tools:
 - get_calendar_range {{ "start": "<YYYY-MM-DD|today>", "end": "<YYYY-MM-DD|+7d>" }}
 - schedule_event {{ "title":"<text>", "time":"<HH:MM>" }}
 - summarize      {{ "source":"email|calendar" }}
+Output JSON **must** use the key "type" (not "tool" or "action").
 Rules:
 • If user says “today / yesterday / tomorrow”, map to exact dates in Pacific Time (UTC-07).
 • If user adds an event like “add 5 pm dinner”, emit **schedule_event**.
@@ -137,6 +138,17 @@ User message:
         return [{"type": "chat", "prompt": "I’m not sure what to do. Can you clarify?"}]
     plan = json.loads(match.group(0))
     return plan if isinstance(plan, list) else []
+
+
+def _normalise(action: dict) -> dict:
+    """Ensure planner actions use the 'type' key."""
+    if "type" in action:
+        return action
+    if "tool" in action:
+        action["type"] = action.pop("tool")
+    elif "action" in action:
+        action["type"] = action.pop("action")
+    return action
 
 
 
@@ -268,6 +280,7 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     except Exception as e:
         return f"\u26a0\ufe0f Planning failed: {e}"
     logging.info("PLAN %s", actions)
+    actions = [_normalise(a) for a in actions]
 
     reflection = chat_completion(
         selected_model,
@@ -299,13 +312,13 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
             action.setdefault("prompt", user_prompt)
         t = action.get("type")
         action["model"] = selected_model
-        if t in TOOL_REGISTRY:
-            try:
-                results[t] = TOOL_REGISTRY[t](action)
-            except Exception as e:
-                results[t] = f"\u26a0\ufe0f {t} error: {e}"
-        else:
-            results[t] = "\u26a0\ufe0f Unknown action type"
+        if t not in TOOL_REGISTRY:
+            results[t] = f"\u26a0\ufe0f Unknown tool '{t}'"
+            continue
+        try:
+            results[t] = TOOL_REGISTRY[t](action)
+        except Exception as e:
+            results[t] = f"\u26a0\ufe0f {t} error: {e}"
 
     logging.info("RESULT KEYS %s", list(results.keys()))
 
