@@ -40,6 +40,7 @@ from memory_db import (
 )
 from summarizer import summarize_text
 from llm_client import chat_completion
+from llm_client import gpt as simple_gpt
 from user_settings import get_selected_model
 
 last_tool_output = {}
@@ -58,7 +59,8 @@ TOOL_REGISTRY = {
     ),
     "schedule_event": lambda a: create_event(
         f"{a.get('title', 'Appointment')} {a.get('time', '21:00')}"
-    )
+    ),
+    "chat": lambda a: simple_gpt(a.get("prompt", "Say hello"))
 }
 
 load_dotenv()
@@ -96,11 +98,14 @@ Example response:
     response = chat_completion(model, messages)
 
     try:
-        return json.loads(response)
+        plan = json.loads(response)
+        if not isinstance(plan, list) or not all("type" in step for step in plan):
+            raise ValueError("Invalid plan structure")
+        return plan
     except Exception as e:
         print("\u26a0\ufe0f Planning error:", e)
         print("Raw model response:", response)
-        return [{"type": "error", "message": f"\u26a0\ufe0f Planning failed: {e}"}]
+        return [{"type": "chat"}]
 
 ONEDRIVE_KEYWORDS = {'onedrive', 'search', 'summarize', 'find', 'list'}
 EMAIL_KEYWORDS = {'gmail', 'email', 'inbox', 'mail'}
@@ -275,6 +280,8 @@ def plan_then_answer(user_prompt: str):
 
     # Dynamically execute actions using TOOL_REGISTRY
     for action in actions:
+        if action.get("type") == "chat":
+            action["prompt"] = user_prompt
         action_type = action.get("type")
         if action_type in TOOL_REGISTRY:
             try:
