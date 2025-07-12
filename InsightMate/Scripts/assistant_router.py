@@ -60,7 +60,7 @@ TOOL_REGISTRY = {
     "schedule_event": lambda a: create_event(
         f"{a.get('title', 'Appointment')} {a.get('time', '21:00')}"
     ),
-    "chat": lambda a: simple_gpt(a.get("prompt", "Say hello"))
+    "chat": lambda a: simple_gpt(a.get("prompt", "Say hello"), a.get("model", "qwen:30b-a3b"))
 }
 
 load_dotenv()
@@ -291,6 +291,7 @@ def plan_then_answer(user_prompt: str):
     for action in actions:
         if action.get("type") == "chat":
             action["prompt"] = user_prompt
+        action["model"] = selected_model
         action_type = action.get("type")
         if action_type in TOOL_REGISTRY:
             try:

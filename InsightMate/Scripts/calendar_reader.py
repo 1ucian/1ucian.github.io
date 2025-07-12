@@ -4,6 +4,7 @@ from googleapiclient.discovery import build
 
 from google_auth import get_credentials
 from dateparser.search import search_dates
+from dateparser import parse as parse_date
 
 CREATE_EVENT_PREFIXES = (
     'add event',
