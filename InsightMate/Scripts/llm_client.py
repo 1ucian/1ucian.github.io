@@ -1,5 +1,6 @@
 import requests
 import openai
+import json
 
 
 def gpt(prompt: str, model: str) -> str:
@@ -31,7 +32,7 @@ def chat_completion(model: str, messages: list[dict]) -> str:
             chunk = line.decode("utf-8").strip()
             if chunk == "[DONE]":
                 break
-            content = requests.utils.json.loads(chunk).get("message", {}).get("content", "")
+            content = json.loads(chunk).get("message", {}).get("content", "")
             full_reply += content
         except Exception as e:
             full_reply += f"\n\u26a0\ufe0f Stream decode error: {e}"

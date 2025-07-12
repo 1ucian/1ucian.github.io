@@ -95,7 +95,12 @@ Example response:
 
     response = chat_completion(model, messages)
 
-    return json.loads(response)
+    try:
+        return json.loads(response)
+    except Exception as e:
+        print("\u26a0\ufe0f Planning error:", e)
+        print("Raw model response:", response)
+        return [{"type": "error", "message": f"\u26a0\ufe0f Planning failed: {e}"}]
 
 ONEDRIVE_KEYWORDS = {'onedrive', 'search', 'summarize', 'find', 'list'}
 EMAIL_KEYWORDS = {'gmail', 'email', 'inbox', 'mail'}
