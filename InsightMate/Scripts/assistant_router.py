@@ -103,27 +103,24 @@ def _get_config():
 
 def plan_actions(user_prompt: str, model: str) -> list[dict]:
     """Map the user's prompt to a list of tool actions."""
-    planning_prompt = f"""
-You are a tool-planning agent. For the **user message** below, output a VALID JSON list (no commentary) of 1-N actions.
-Available tools:
-- search_email  {{ "query": "<keywords>" }}
-- get_calendar   {{ "date": "<YYYY-MM-DD|today|yesterday>" }}
-- get_calendar_range {{ "start": "<YYYY-MM-DD|today>", "end": "<YYYY-MM-DD|+7d>" }}
-- schedule_event {{ "title":"<text>", "time":"<HH:MM>" }}
-- summarize      {{ "source":"email|calendar" }}
-Output JSON **must** use the key "type" (not "tool" or "action").
-Rules:
-• If user says “today / yesterday / tomorrow”, map to exact dates in Pacific Time (UTC-07).
-• If user adds an event like “add 5 pm dinner”, emit **schedule_event**.
-• If user says “change 5 pm today”, emit get_calendar + schedule_event (update).
-• If user asks follow-up (“titles”, “summary”, “all of them”), emit summarize.
-• If user says "list calendar" or "calendar events today":
-  output [{ "type":"get_calendar","date":"today" }]
-
-Only output the JSON array. No <think> tags.
-User message:
-{user_prompt}
-"""
+    planning_prompt = (
+        "You are a tool-planning agent. For the **user message** below, output a VALID JSON list (no commentary) of 1-N actions.\n"
+        "Available tools:\n"
+        "- search_email  {{ \"query\": \"<keywords>\" }}\n"
+        "- get_calendar   {{ \"date\": \"<YYYY-MM-DD|today|yesterday>\" }}\n"
+        "- get_calendar_range {{ \"start\": \"<YYYY-MM-DD|today>\", \"end\": \"<YYYY-MM-DD|+7d>\" }}\n"
+        "- schedule_event {{ \"title\":\"<text>\", \"time\":\"<HH:MM>\" }}\n"
+        "- summarize      {{ \"source\":\"email|calendar\" }}\n"
+        "Output JSON **must** use the key \"type\" (not \"tool\" or \"action\").\n"
+        "Rules:\n"
+        "• If user says “today / yesterday / tomorrow”, map to exact dates in Pacific Time (UTC-07).\n"
+        "• If user adds an event like “add 5 pm dinner”, emit **schedule_event**.\n"
+        "• If user says “change 5 pm today”, emit get_calendar + schedule_event (update).\n"
+        "• If user asks follow-up (“titles”, “summary”, “all of them”), emit summarize.\n"
+        "• If user says \"list calendar\" or \"calendar events today\":\n  output [{ \"type\":\"get_calendar\",\"date\":\"today\" }]\n\n"
+        "Only output the JSON array. No <think> tags.\n"
+        "User message:\n{msg}\n"
+    ).format(msg=user_prompt.replace('{', '[').replace('}', ']'))
 
     response = chat_completion(
         model,
@@ -275,6 +272,16 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     if prompt_clean in ["hi", "hello", "hey", "how are you", "yo", "what's up", "good afternoon"]:
         return chat_completion(selected_model, [{"role": "user", "content": user_prompt}])
 
+    # ---- THINK stage ---------------------------------------------------
+    thought = chat_completion(
+        selected_model,
+        [
+            {"role": "system", "content": "You are reasoning internally. Explain (in ONE short sentence) what you will do next."},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+    logging.info("THOUGHT %s", thought)
+
     # Clean context if irrelevant
     if not _is_relevant(last_tool_output, user_prompt):
         last_tool_output = {}
@@ -289,6 +296,13 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
         return f"\u26a0\ufe0f Planning failed: {e}"
     logging.info("PLAN %s", actions)
     actions = [_normalise(a) for a in actions]
+
+    for a in actions:
+        if "type" not in a:
+            return "\u26a0\ufe0f Planner output lacked 'type'. Please retry."
+
+    if actions == [{"type": "chat"}]:
+        return "\u26a0\ufe0f I couldn't find any relevant action. Try rephrasing."
 
     reflection = chat_completion(
         selected_model,
@@ -338,10 +352,10 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     logging.info("RESULT KEYS %s", list(results.keys()))
 
     last_tool_output = results
-    reply = format_results(results)
-    if reply.lower().startswith("chat:"):
-        reply = reply.split(":", 1)[1].lstrip()
-    return reply
+    reply_text = format_results(results)
+    if not reply_text:
+        reply_text = "\u2139\ufe0f No data returned."
+    return reply_text
 
 
 def format_results(res):
