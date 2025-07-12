@@ -118,7 +118,8 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
         "• If user adds an event like “add 5 pm dinner”, emit **schedule_event**.\n"
         "• If user says “change 5 pm today”, emit get_calendar + schedule_event (update).\n"
         "• If user asks follow-up (“titles”, “summary”, “all of them”), emit summarize.\n"
-        "• If user says \"list calendar\" or \"calendar events today\":\n  output [{ \"type\":\"get_calendar\",\"date\":\"today\" }]\n\n"
+        "• If user says \"list calendar\" or \"calendar events today\":\n  output [{ \"type\":\"get_calendar\",\"date\":\"today\" }]\n"
+        "• If user says \"list emails\" or \"emails today\":\n  output [{ \"type\":\"search_email\", \"query\": \"today\" }]\n\n"
         "Only output the JSON array. No <think> tags.\n"
         "User message:\n{msg}\n"
     ).format(msg=user_prompt.replace('{', '[').replace('}', ']'))
@@ -275,15 +276,6 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     selected_model = get_selected_model()
     prompt_clean = user_prompt.lower().strip()
 
-    if re.search(r"\b(list|show|get)\s+emails?\b", prompt_clean):
-        query_word = "today"
-        if "yesterday" in prompt_clean:
-            query_word = "yesterday"
-        elif "today" in prompt_clean:
-            query_word = "today"
-        emails = search_emails(query_word)
-        last_tool_output = {"email": emails}
-        return format_results({"email": emails})
 
     FOLLOW = prompt_clean
     if last_tool_output and FOLLOW in {"titles", "all of them", "entire week"}:
