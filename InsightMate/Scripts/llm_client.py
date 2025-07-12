@@ -1,8 +1,22 @@
 import os
 import json
 import requests
+import logging
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+BASE_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+MODEL_NAME = os.getenv("LLM_MODEL", "qwen3:30b-a3b")
+
+try:
+    requests.get(BASE_URL, timeout=3)
+except Exception:
+    print(
+        f"\u26a0\ufe0f Ollama not reachable at {BASE_URL}. Start with:  ollama serve && ollama run {MODEL_NAME}"
+    )
+
+# Backwards compatibility
+OLLAMA_URL = BASE_URL
 
 
 def gpt(prompt: str, model: str) -> str:
@@ -18,20 +32,21 @@ def chat_completion(model: str, messages: list[dict]) -> str:
         resp = client.chat.completions.create(model=model, messages=messages)
         return resp.choices[0].message.content.strip()
 
+    payload = {"model": model, "messages": messages, "stream": False}
     try:
-        resp = requests.post(
-            f"{OLLAMA_URL}/api/chat",
-            json={"model": model, "messages": messages, "stream": False},
-            timeout=60,
+        response = requests.post(
+            f"{BASE_URL}/api/chat", json=payload, stream=True, timeout=120
         )
-        resp.raise_for_status()
-        return resp.json()["message"]["content"].strip()
+        response.raise_for_status()
     except requests.HTTPError as e:
-        if e.response is not None and e.response.status_code == 404:
+        logging.error("LLM %s", e)
+        return f"\u26a0\ufe0f LLM error: {e.response.status_code}"
+    except requests.exceptions.RequestException as e:
+        logging.error("LLM call failed: %s", e)
+        if isinstance(e, requests.HTTPError) and e.response is not None and e.response.status_code == 404:
             return (
                 f"\u26a0\ufe0f Model '{model}' not found. "
                 f"Run `ollama pull {model}` or choose another model in Settings."
             )
-        return f"\u26a0\ufe0f Qwen API error: {str(e)}"
-    except Exception as e:
-        return f"\u26a0\ufe0f Qwen API error: {str(e)}"
+        return f"\u26a0\ufe0f LLM error: {e}"
+    return response.json()["message"]["content"].strip()
