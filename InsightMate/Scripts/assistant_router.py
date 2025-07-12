@@ -103,6 +103,13 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
     if not match:
         print("\u26a0\ufe0f No valid JSON block found in planner output")
         print("Raw model response:", response)
+        logs_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "logs"))
+        os.makedirs(logs_dir, exist_ok=True)
+        log_path = os.path.join(
+            logs_dir, f"planner_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        )
+        with open(log_path, "w") as f:
+            f.write(response)
         if response.strip().startswith("\u26a0\ufe0f"):
             return [{"type": "chat", "prompt": response}]
         return [{"type": "chat", "prompt": "I'm not sure what to do. Can you clarify?"}]
@@ -112,6 +119,13 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
     except Exception as e:
         print("\u26a0\ufe0f Failed to parse JSON:", e)
         print("Raw block:", match.group(0))
+        logs_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "logs"))
+        os.makedirs(logs_dir, exist_ok=True)
+        log_path = os.path.join(
+            logs_dir, f"planner_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        )
+        with open(log_path, "w") as f:
+            f.write(response)
         return [{"type": "chat", "prompt": "Invalid plan format."}]
 
 
