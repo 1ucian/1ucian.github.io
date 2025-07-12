@@ -1,6 +1,4 @@
 InsightMate/Scripts/memory.db
 InsightMate/Scripts/config.json
 .env
-
-**/__pycache__/
-*.pyc
+logs/
