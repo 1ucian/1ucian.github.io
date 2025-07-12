@@ -97,15 +97,24 @@ Example response:
 
     response = chat_completion(model, messages)
 
+    # Extract the first JSON block (starting with [ and ending with ])
+    import re
+    matches = re.findall(r"\[\s*{.*?}\s*\]", response, re.DOTALL)
+
+    if not matches:
+        print("\u26a0\ufe0f No valid JSON block found in planner output")
+        print("Raw model response:", response)
+        return [{"type": "chat", "prompt": "I'm not sure what to do. Can you clarify?"}]
+
     try:
-        plan = json.loads(response)
+        plan = json.loads(matches[0])
         if not isinstance(plan, list) or not all("type" in step for step in plan):
             raise ValueError("Invalid plan structure")
         return plan
     except Exception as e:
-        print("\u26a0\ufe0f Planning error:", e)
-        print("Raw model response:", response)
-        return [{"type": "chat"}]
+        print("\u26a0\ufe0f Failed to parse planner JSON:", e)
+        print("Raw match:", matches[0])
+        return [{"type": "chat", "prompt": "I'm not sure what to do. Can you clarify?"}]
 
 ONEDRIVE_KEYWORDS = {'onedrive', 'search', 'summarize', 'find', 'list'}
 EMAIL_KEYWORDS = {'gmail', 'email', 'inbox', 'mail'}
