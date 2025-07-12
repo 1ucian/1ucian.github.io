@@ -8,10 +8,10 @@ def _load_model() -> str:
     if os.path.exists(MODEL_FILE):
         try:
             with open(MODEL_FILE, "r") as f:
-                return json.load(f).get("model", os.getenv("LLM_MODEL", "qwen3:30b-a3b"))
+                return json.load(f).get("model", os.getenv("LLM_MODEL", "qwen3:72b-a14b"))
         except Exception:
-            return os.getenv("LLM_MODEL", "qwen3:30b-a3b")
-    return os.getenv("LLM_MODEL", "qwen3:30b-a3b")
+            return os.getenv("LLM_MODEL", "qwen3:72b-a14b")
+    return os.getenv("LLM_MODEL", "qwen3:72b-a14b")
 
 def _save_model(name: str) -> None:
     try:

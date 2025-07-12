@@ -6,6 +6,8 @@ import requests
 import openai
 import json
 import difflib
+import logging
+import time
 from dotenv import load_dotenv
 from config import load_config, get_api_key, get_llm, get_prompt
 
@@ -42,10 +44,12 @@ def _is_relevant(prior: dict, query: str) -> bool:
     tokens = [w for w in query.lower().split() if len(w) > 3][:4]
     return any(t in text for t in tokens)
 
+FOLLOW_UP_KEYWORDS = {"all of them", "entire week", "titles", "summarize", "readable"}
+
 last_tool_output = {}
 
 TOOL_REGISTRY = {
-    "search_email": lambda a: search_emails(a.get("query", "")),
+    "search_email": lambda a: search_emails(a.get("query") or "today"),
     "get_calendar": lambda a: list_events_for_day(
         parse_date(a.get("date", "today")).strftime("%Y-%m-%d")
     ) if parse_date(a.get("date", "today")) else "\u26a0\ufe0f Invalid date",
@@ -85,6 +89,9 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
         "1. Think from the user text only; no hard-coded commands.\n"
         "2. Return 1-3 tools. If nothing fits, return [ {\"type\":\"chat\"} ].\n"
         "3. Output **only** the JSON list, no commentary.\n"
+        "- If user says \"today's emails\": {\"type\":\"search_email\",\"query\":\"today\"}\n"
+        "- If user says \"emails from <keyword>\": use that exact keyword.\n"
+        "- If user asks \"calendar this week\": {\"type\":\"get_calendar_range\",\"start\":\"today\",\"end\":\"+7d\"}\n"
         "\n"
         "User message:\n"
         f"{user_prompt}"
@@ -101,8 +108,14 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
     import re, json
     match = re.search(r"\[[\s\S]+?]", response)
     if not match:
-        print("\u26a0\ufe0f No valid JSON block found in planner output")
-        print("Raw model response:", response)
+        log_path = os.path.join("logs", f"planner_{int(time.time())}.txt")
+        try:
+            os.makedirs("logs", exist_ok=True)
+            with open(log_path, "w") as f:
+                f.write(response)
+        except Exception:
+            pass
+        logging.error("No JSON block found in planner output. Saved to %s", log_path)
         if response.strip().startswith("\u26a0\ufe0f"):
             return [{"type": "chat", "prompt": response}]
         return [{"type": "chat", "prompt": "I'm not sure what to do. Can you clarify?"}]
@@ -110,8 +123,14 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
     try:
         return json.loads(match.group(0))
     except Exception as e:
-        print("\u26a0\ufe0f Failed to parse JSON:", e)
-        print("Raw block:", match.group(0))
+        log_path = os.path.join("logs", f"planner_{int(time.time())}.txt")
+        try:
+            os.makedirs("logs", exist_ok=True)
+            with open(log_path, "w") as f:
+                f.write(match.group(0))
+        except Exception:
+            pass
+        logging.error("Failed to parse planner JSON: %s. Saved to %s", e, log_path)
         return [{"type": "chat", "prompt": "Invalid plan format."}]
 
 
@@ -220,6 +239,20 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     if prompt_clean in ["hi", "hello", "hey", "how are you", "yo", "what's up", "good afternoon"]:
         return chat_completion(selected_model, [{"role": "user", "content": user_prompt}])
 
+    if last_tool_output and prompt_clean in FOLLOW_UP_KEYWORDS:
+        if "email" in last_tool_output:
+            emails = last_tool_output["email"]
+            if "titles" in prompt_clean:
+                return "\n".join(e.get("subject", "") for e in emails)
+            if "summarize" in prompt_clean or "readable" in prompt_clean:
+                return summarize_text(emails)
+            return format_results({"email": emails})
+        if "calendar" in last_tool_output:
+            events = last_tool_output["calendar"]
+            if "summarize" in prompt_clean:
+                return summarize_text(events)
+            return format_results({"calendar": events})
+
     # Clean context if irrelevant
     if not _is_relevant(last_tool_output, user_prompt):
         last_tool_output = {}
@@ -276,21 +309,22 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
 
 def format_results(results):
     lines = []
-    for k, v in results.items():
+    for t, v in results.items():
         if isinstance(v, list):
             for item in v:
                 if isinstance(item, dict):
-                    lines.append(
-                        f"{k}: " + " | ".join(f"{ik}: {iv}" for ik, iv in item.items())
-                    )
+                    title = item.get("subject") or item.get("title")
+                    when = item.get("start") or ""
+                    snippet = item.get("snippet", "")[:120]
+                    lines.append(f"\u2022 {title} {when} — {snippet}")
                 else:
-                    lines.append(f"{k}: {item}")
+                    lines.append(f"\u2022 {item}")
         elif isinstance(v, dict):
-            lines.append(
-                f"{k}: " + " | ".join(f"{ik}: {iv}" for ik, iv in v.items())
-            )
+            title = v.get("title") or v.get("subject")
+            when = v.get("start") or ""
+            lines.append(f"\u2022 {title} {when}")
         else:
-            lines.append(f"{k}: {v}")
+            lines.append(str(v))
     return "\n".join(lines)
 
 
