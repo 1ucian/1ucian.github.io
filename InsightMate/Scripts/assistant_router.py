@@ -62,8 +62,14 @@ FOLLOW_UPS = {
 
 last_tool_output = {}
 
+def _search_email(a):
+    try:
+        return search_emails(a.get("query") or "today")
+    except Exception as e:
+        return f"\u26a0\ufe0f email error: {e}"
+
 TOOL_REGISTRY = {
-    "search_email": lambda a: search_emails(a.get("query") or "today"),
+    "search_email": _search_email,
     "get_calendar": lambda a: list_events_for_day(
         parse_date(a.get("date", "today")).strftime("%Y-%m-%d")
     ) if parse_date(a.get("date", "today")) else "\u26a0\ufe0f Invalid date",
@@ -105,7 +111,8 @@ def _get_config():
 def plan_actions(user_prompt: str, model: str) -> list[dict]:
     """Map the user's prompt to a list of tool actions."""
     planning_prompt = (
-        "You are a tool-planning agent. For the **user message** below, output a VALID JSON list (no commentary) of 1-N actions.\n"
+        "You are a tool-planning agent with direct Gmail and Calendar access via these tools. "
+        "For the **user message** below, output a VALID JSON list (no commentary) of 1-N actions.\n"
         "Available tools:\n"
         "- search_email  {{ \"query\": \"<keywords>\" }}\n"
         "- get_calendar   {{ \"date\": \"<YYYY-MM-DD|today|yesterday>\" }}\n"
@@ -302,7 +309,14 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     thought = chat_completion(
         selected_model,
         [
-            {"role": "system", "content": "You are reasoning internally. Explain (in ONE short sentence) what you will do next."},
+            {
+                "role": "system",
+                "content": (
+                    "You are reasoning internally. You can read Gmail using the "
+                    "search_email tool and access Calendar via get_calendar. "
+                    "Explain in ONE short sentence what you will do next."
+                ),
+            },
             {"role": "user", "content": user_prompt},
         ],
     )
