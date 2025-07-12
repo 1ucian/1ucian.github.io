@@ -135,8 +135,26 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
     if not match:
         print("\u26a0\ufe0f Planner returned no JSON. Raw:", response[:300])
         return [{"type": "chat", "prompt": "I’m not sure what to do. Can you clarify?"}]
-    plan = json.loads(match.group(0))
-    return plan if isinstance(plan, list) else []
+
+    try:
+        plan = json.loads(match.group(0))
+    except Exception as e:
+        print("\u26a0\ufe0f Failed to parse planner JSON:", e)
+        return [{"type": "chat", "prompt": "Planning error."}]
+
+    if isinstance(plan, dict):
+        plan = [plan]
+    if not isinstance(plan, list):
+        return [{"type": "chat"}]
+
+    out = []
+    for a in plan:
+        if not isinstance(a, dict):
+            continue
+        a = _normalise(a)
+        if "type" in a:
+            out.append(a)
+    return out
 
 
 def _normalise(action: dict) -> dict:
