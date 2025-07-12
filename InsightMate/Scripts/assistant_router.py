@@ -6,6 +6,9 @@ import requests
 import openai
 import json
 import difflib
+import logging
+import time
+import re
 from dotenv import load_dotenv
 from config import load_config, get_api_key, get_llm, get_prompt
 
@@ -13,8 +16,10 @@ from gmail_reader import search_emails
 from calendar_reader import (
     list_events_for_day,
     list_events_for_range,
+    create_event,
 )
 from dateparser import parse as parse_date
+from date_utils import date_keyword, today_pt
 from reminder_scheduler import (
     schedule as schedule_reminder,
     schedule_air_quality,
@@ -32,6 +37,7 @@ from memory_db import (
 from summarizer import summarize_text
 from llm_client import chat_completion, gpt
 from server_common import _load_model
+from user_settings import get_selected_model
 
 
 def _is_relevant(prior: dict, query: str) -> bool:
@@ -42,10 +48,28 @@ def _is_relevant(prior: dict, query: str) -> bool:
     tokens = [w for w in query.lower().split() if len(w) > 3][:4]
     return any(t in text for t in tokens)
 
+FOLLOW_UPS = {
+    "titles",
+    "summarize",
+    "summary",
+    "paragraph",
+    "readable",
+    "all of them",
+    "entire week",
+    "what about yesterday",
+    "yesterday",
+}
+
 last_tool_output = {}
 
+def _search_email(a):
+    try:
+        return search_emails(a.get("query") or "today")
+    except Exception as e:
+        return f"\u26a0\ufe0f email error: {e}"
+
 TOOL_REGISTRY = {
-    "search_email": lambda a: search_emails(a.get("query", "")),
+    "search_email": _search_email,
     "get_calendar": lambda a: list_events_for_day(
         parse_date(a.get("date", "today")).strftime("%Y-%m-%d")
     ) if parse_date(a.get("date", "today")) else "\u26a0\ufe0f Invalid date",
@@ -58,8 +82,23 @@ TOOL_REGISTRY = {
             "\u26a0\ufe0f No previous tool output"
         )
     ),
-    "chat": lambda a: gpt(a.get("prompt", "Say hello"), a.get("model", _load_model()))
+    "chat": lambda a: gpt(a.get("prompt", ""), a["model"]),
+    "schedule_event": lambda a: _schedule(a)
 }
+
+def _schedule(a):
+    date_str = a.get("date")
+    when = a.get("time", "17:00")
+    if date_str:
+        parsed = parse_date(date_str)
+        if parsed:
+            date = parsed.date()
+        else:
+            date = today_pt()
+    else:
+        date = today_pt()
+    title = a.get("title", "Appointment")
+    return create_event(f"{title} {date} {when}")
 
 load_dotenv()
 
@@ -72,23 +111,25 @@ def _get_config():
 def plan_actions(user_prompt: str, model: str) -> list[dict]:
     """Map the user's prompt to a list of tool actions."""
     planning_prompt = (
-        "You are a planner. Convert the user’s message into a JSON list of tools.\n"
-        "\n"
+        "You are a tool-planning agent with direct Gmail and Calendar access via these tools. "
+        "For the **user message** below, output a VALID JSON list (no commentary) of 1-N actions.\n"
         "Available tools:\n"
-        "- search_email        { \"type\": \"search_email\", \"query\": \"<keywords>\" }\n"
-        "- get_calendar        { \"type\": \"get_calendar\", \"date\": \"<date>\" }\n"
-        "- get_calendar_range  { \"type\": \"get_calendar_range\", \"start\": \"<start>\", \"end\": \"<end>\" }\n"
-        "- summarize           { \"type\": \"summarize\" }\n"
-        "- chat                { \"type\": \"chat\" }\n"
-        "\n"
-        "RULES:\n"
-        "1. Think from the user text only; no hard-coded commands.\n"
-        "2. Return 1-3 tools. If nothing fits, return [ {\"type\":\"chat\"} ].\n"
-        "3. Output **only** the JSON list, no commentary.\n"
-        "\n"
-        "User message:\n"
-        f"{user_prompt}"
-    )
+        "- search_email  {{ \"query\": \"<keywords>\" }}\n"
+        "- get_calendar   {{ \"date\": \"<YYYY-MM-DD|today|yesterday>\" }}\n"
+        "- get_calendar_range {{ \"start\": \"<YYYY-MM-DD|today>\", \"end\": \"<YYYY-MM-DD|+7d>\" }}\n"
+        "- schedule_event {{ \"title\":\"<text>\", \"time\":\"<HH:MM>\" }}\n"
+        "- summarize      {{ \"source\":\"email|calendar\" }}\n"
+        "Output JSON **must** use the key \"type\" (not \"tool\" or \"action\").\n"
+        "Rules:\n"
+        "• If user says “today / yesterday / tomorrow”, map to exact dates in Pacific Time (UTC-07).\n"
+        "• If user adds an event like “add 5 pm dinner”, emit **schedule_event**.\n"
+        "• If user says “change 5 pm today”, emit get_calendar + schedule_event (update).\n"
+        "• If user asks follow-up (“titles”, “summary”, “all of them”), emit summarize.\n"
+        "• If user says \"list calendar\" or \"calendar events today\":\n  output [{ \"type\":\"get_calendar\",\"date\":\"today\" }]\n"
+        "• If user says \"list emails\" or \"emails today\":\n  output [{ \"type\":\"search_email\", \"query\": \"today\" }]\n\n"
+        "Only output the JSON array. No <think> tags.\n"
+        "User message:\n{msg}\n"
+    ).format(msg=user_prompt.replace('{', '[').replace('}', ']'))
 
     response = chat_completion(
         model,
@@ -99,20 +140,48 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
     )
 
     import re, json
-    match = re.search(r"\[[\s\S]+?]", response)
+    match = re.search(r"\[[\s\S]*?]", response)
     if not match:
-        print("\u26a0\ufe0f No valid JSON block found in planner output")
-        print("Raw model response:", response)
-        if response.strip().startswith("\u26a0\ufe0f"):
-            return [{"type": "chat", "prompt": response}]
-        return [{"type": "chat", "prompt": "I'm not sure what to do. Can you clarify?"}]
+        print("\u26a0\ufe0f Planner returned no JSON. Raw:", response[:300])
+        return [{"type": "chat", "prompt": "I’m not sure what to do. Can you clarify?"}]
 
     try:
-        return json.loads(match.group(0))
+        plan = json.loads(match.group(0))
     except Exception as e:
-        print("\u26a0\ufe0f Failed to parse JSON:", e)
-        print("Raw block:", match.group(0))
-        return [{"type": "chat", "prompt": "Invalid plan format."}]
+        print("\u26a0\ufe0f Failed to parse planner JSON:", e)
+        return [{"type": "chat", "prompt": "Planning error."}]
+
+    if isinstance(plan, dict):
+        plan = [plan]
+    if not isinstance(plan, list):
+        return [{"type": "chat"}]
+
+    out = []
+    for a in plan:
+        if not isinstance(a, dict):
+            continue
+        a = _normalise(a)
+        if "type" in a:
+            out.append(a)
+    return out
+
+
+def _normalise(action: dict) -> dict:
+    """Ensure planner actions use the 'type' key and clean stray quotes."""
+    if not isinstance(action, dict):
+        return {}
+    cleaned = {}
+    for k, v in action.items():
+        key = str(k).strip().strip('"').strip("'")
+        cleaned[key] = v
+    action = cleaned
+    if "type" in action:
+        return action
+    if "tool" in action:
+        action["type"] = action.pop("tool")
+    elif "action" in action:
+        action["type"] = action.pop("action")
+    return action
 
 
 
@@ -213,12 +282,47 @@ def generate_response(user_prompt: str, data: dict, cot_mode: bool) -> str:
 def plan_then_answer(user_prompt: str, model: str | None = None):
     """Plan actions for ``user_prompt`` then execute them."""
     global last_tool_output
-    selected_model = model or _load_model()
+    selected_model = get_selected_model()
     prompt_clean = user_prompt.lower().strip()
+
+
+    FOLLOW = prompt_clean
+    if last_tool_output and FOLLOW in {"titles", "all of them", "entire week"}:
+        if "email" in last_tool_output:
+            emails = last_tool_output["email"]
+            if "titles" in FOLLOW:
+                return "\n".join(e["subject"] for e in emails)
+            return summarize_text(emails)
+        if "calendar" in last_tool_output:
+            events = last_tool_output["calendar"]
+            return summarize_text(events)
+
+    if last_tool_output and prompt_clean.startswith(("summarize", "summary")):
+        for key in ("email", "search_email", "calendar", "get_calendar"):
+            if key in last_tool_output:
+                return summarize_text(last_tool_output[key])
+        return "\u26a0\ufe0f Nothing to summarize."
 
     # Casual conversation fallback
     if prompt_clean in ["hi", "hello", "hey", "how are you", "yo", "what's up", "good afternoon"]:
         return chat_completion(selected_model, [{"role": "user", "content": user_prompt}])
+
+    # ---- THINK stage ---------------------------------------------------
+    thought = chat_completion(
+        selected_model,
+        [
+            {
+                "role": "system",
+                "content": (
+                    "You are reasoning internally. You can read Gmail using the "
+                    "search_email tool and access Calendar via get_calendar. "
+                    "Explain in ONE short sentence what you will do next."
+                ),
+            },
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+    logging.info("THOUGHT %s", thought)
 
     # Clean context if irrelevant
     if not _is_relevant(last_tool_output, user_prompt):
@@ -232,6 +336,24 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
         actions = plan_actions(user_prompt + context_hint, selected_model)
     except Exception as e:
         return f"\u26a0\ufe0f Planning failed: {e}"
+    logging.info("PLAN %s", actions)
+    normalised = []
+    for a in actions:
+        try:
+            a = _normalise(a)
+        except Exception as e:
+            logging.error("normalise failed: %s", e)
+            continue
+        normalised.append(a)
+    actions = normalised
+
+    for a in actions:
+        if "type" not in a:
+            logging.error("missing type in action: %s", a)
+            return "\u26a0\ufe0f Planner output lacked 'type'. Please retry."
+
+    if actions == [{"type": "chat"}]:
+        return "\u26a0\ufe0f I couldn't find any relevant action. Try rephrasing."
 
     reflection = chat_completion(
         selected_model,
@@ -246,6 +368,8 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
             },
         ],
     )
+    if reflection.lower().startswith("<think"):
+        reflection = "PROCEED"
     if "suggest" in reflection.lower():
         revised = plan_actions(reflection, selected_model)
         if revised:
@@ -257,41 +381,49 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     results = {}
 
     for action in actions:
-        action_type = action.get("type")
+        if action.get("type") == "chat":
+            action.setdefault("prompt", user_prompt)
+        t = action.get("type")
         action["model"] = selected_model
-        if action_type in TOOL_REGISTRY:
-            try:
-                results[action_type] = TOOL_REGISTRY[action_type](action)
-            except Exception as e:
-                results[action_type] = f"\u26a0\ufe0f Tool error: {str(e)}"
-        else:
-            results[action_type] = "\u26a0\ufe0f Unknown action type"
+        if t not in TOOL_REGISTRY:
+            results[t] = f"\u26a0\ufe0f Unknown tool '{t}'"
+            continue
+        try:
+            out = TOOL_REGISTRY[t](action)
+            results[t] = out
 
-    last_tool_output.update(results)
-    reply = format_results(results)
-    if reply.lower().startswith("chat:"):
-        reply = reply.split(":", 1)[1].lstrip()
-    return reply
+            # store unified aliases for follow-ups
+            if t == "search_email":
+                results["email"] = out
+            if t in {"get_calendar", "get_calendar_range"}:
+                results["calendar"] = out
+        except Exception as e:
+            results[t] = f"\u26a0\ufe0f {t} error: {e}"
+
+    logging.info("RESULT KEYS %s", list(results.keys()))
+
+    last_tool_output = results
+    reply_text = format_results(results)
+    if not reply_text:
+        reply_text = "\u2139\ufe0f No data returned."
+    return reply_text
 
 
-def format_results(results):
-    lines = []
-    for k, v in results.items():
+def format_results(res):
+    out = []
+    for k, v in res.items():
         if isinstance(v, list):
             for item in v:
-                if isinstance(item, dict):
-                    lines.append(
-                        f"{k}: " + " | ".join(f"{ik}: {iv}" for ik, iv in item.items())
-                    )
-                else:
-                    lines.append(f"{k}: {item}")
+                subj = item.get("subject") or item.get("title", "")
+                when = item.get("start", "")[:16]
+                out.append(f"\u2022 {subj} {when}")
         elif isinstance(v, dict):
-            lines.append(
-                f"{k}: " + " | ".join(f"{ik}: {iv}" for ik, iv in v.items())
-            )
+            subj = v.get("subject") or v.get("title", "")
+            when = v.get("start", "")[:16]
+            out.append(f"\u2022 {subj} {when}")
         else:
-            lines.append(f"{k}: {v}")
-    return "\n".join(lines)
+            out.append(str(v))
+    return "\n".join(out)
 
 
 def _extract_minutes(text: str) -> Optional[int]:

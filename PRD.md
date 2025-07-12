@@ -6,6 +6,7 @@ InsightMate is a cross-platform personal assistant bundled within this repositor
 ## Goals
 - Provide a local, privacy‑conscious assistant that integrates with existing desktop data (Gmail, Calendar and OneDrive).
 - Offer flexible language model choices (OpenAI API or local Llama 3 via Ollama).
+- The default model is **qwen3:30b-a3b** but users can switch models in the Settings panel.
 - Allow quick interaction through an always‑on UI with optional voice input and system tray control.
 - Maintain compatibility with the Model Context Protocol (MCP) standard to simplify future integrations.
   - Handle complex requests with multi-step thinking and processing so the assistant can plan before answering.
