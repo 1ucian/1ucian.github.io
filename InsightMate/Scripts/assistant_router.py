@@ -74,38 +74,37 @@ def _get_config():
 
 
 def plan_actions(user_prompt: str, model: str) -> list[dict]:
-    import re, json
-    from llm_client import chat_completion
+    """Map the user's prompt to a list of tool actions."""
+    prompt = f"""You are a planner. Based on the user's message, output a JSON list of tools to use.
 
-    prompt = f"""You are an AI planner. Based on the user's input, decide which tools to use. Output a valid JSON list.
-
-User prompt:
+User:
 {user_prompt}
 
-Examples:
-[{{"type": "get_calendar"}}, {{"type": "search_email", "query": "latest"}}]
+Example output:
+[
+  {{ "type": "search_email", "query": "lab results" }},
+  {{ "type": "get_calendar", "date": "today" }}
+]
 """
 
-    messages = [
-        {"role": "system", "content": "You're a smart assistant planner."},
+    response = chat_completion(model, [
+        {"role": "system", "content": "You're a planner that maps user prompts to structured actions."},
         {"role": "user", "content": prompt},
-    ]
+    ])
 
-    response = chat_completion(model, messages)
-
-    match = re.search(r"\[[\s\S]*?\]", response)
+    import re, json
+    match = re.search(r"\[[\s\S]+?]", response)
     if not match:
         print("\u26a0\ufe0f No valid JSON block found in planner output")
         print("Raw model response:", response)
         return [{"type": "chat", "prompt": "I'm not sure what to do. Can you clarify?"}]
 
     try:
-        plan = json.loads(match.group(0))
-        return plan if isinstance(plan, list) else []
+        return json.loads(match.group(0))
     except Exception as e:
-        print("\u26a0\ufe0f Failed to parse planner JSON:", e)
-        print("Raw extracted block:", match.group(0))
-        return [{"type": "chat", "prompt": "I'm not sure what to do. Can you clarify?"}]
+        print("\u26a0\ufe0f Failed to parse JSON:", e)
+        print("Raw block:", match.group(0))
+        return [{"type": "chat", "prompt": "Invalid plan format."}]
 
 ONEDRIVE_KEYWORDS = {'onedrive', 'search', 'summarize', 'find', 'list'}
 EMAIL_KEYWORDS = {'gmail', 'email', 'inbox', 'mail'}
@@ -258,45 +257,45 @@ def generate_response(user_prompt: str, data: dict, cot_mode: bool) -> str:
 
 
 
-def plan_then_answer(user_prompt: str):
-    selected_model = get_selected_model()
+def plan_then_answer(user_prompt: str, model: str = "qwen:30b-a3b"):
+    """Plan actions for ``user_prompt`` then execute them."""
+    global last_tool_output
+    selected_model = model or get_selected_model()
     prompt_clean = user_prompt.lower().strip()
 
-    # Handle small talk or casual prompts
-    if prompt_clean in ["hi", "hello", "hey", "how are you", "yo", "what's up", "sup", "good morning", "good evening"]:
+    # Casual conversation fallback
+    if prompt_clean in ["hi", "hello", "hey", "how are you", "yo", "what's up", "good afternoon"]:
         return chat_completion(selected_model, [{"role": "user", "content": user_prompt}])
 
-    # Attempt to plan actions
+    # Follow-up summarization or formatting requests
+    if "summarize" in prompt_clean or "readable" in prompt_clean or "titles" in prompt_clean:
+        for key in ["email", "calendar"]:
+            if key in last_tool_output:
+                return summarize_text(last_tool_output[key])
+        return "\u26a0\ufe0f No previous content available to summarize or format."
+
     try:
         actions = plan_actions(user_prompt, selected_model)
     except Exception as e:
-        return "\u26a0\ufe0f Planning failed: " + str(e)
+        return f"\u26a0\ufe0f Planning failed: {e}"
 
-    # Fallback if no actions returned
-    if not actions or len(actions) == 0:
+    if not actions:
         return "\u26a0\ufe0f I couldn't determine what action to take."
 
     results = {}
 
-    # Dynamically execute actions using TOOL_REGISTRY
     for action in actions:
-        if action.get("type") == "chat":
-            action["prompt"] = user_prompt
-        action["model"] = selected_model
         action_type = action.get("type")
+        action["model"] = selected_model
         if action_type in TOOL_REGISTRY:
             try:
-                result = TOOL_REGISTRY[action_type](action)
-                results[action_type] = result
+                results[action_type] = TOOL_REGISTRY[action_type](action)
             except Exception as e:
                 results[action_type] = f"\u26a0\ufe0f Tool error: {str(e)}"
         else:
             results[action_type] = "\u26a0\ufe0f Unknown action type"
 
-    # Save results for follow-up summarization
-    for key, val in results.items():
-        last_tool_output[key] = val
-
+    last_tool_output.update(results)
     return format_results(results)
 
 
