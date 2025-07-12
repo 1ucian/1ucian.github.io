@@ -1,5 +1,24 @@
 import os
+import json
 from flask import Blueprint, jsonify, request, current_app
+
+MODEL_FILE = os.path.join(os.getcwd(), "model_config.json")
+
+def _load_model() -> str:
+    if os.path.exists(MODEL_FILE):
+        try:
+            with open(MODEL_FILE, "r") as f:
+                return json.load(f).get("model", os.getenv("LLM_MODEL", "qwen3:30b-a3b"))
+        except Exception:
+            return os.getenv("LLM_MODEL", "qwen3:30b-a3b")
+    return os.getenv("LLM_MODEL", "qwen3:30b-a3b")
+
+def _save_model(name: str) -> None:
+    try:
+        with open(MODEL_FILE, "w") as f:
+            json.dump({"model": name}, f)
+    except Exception:
+        pass
 
 from assistant_router import route
 from user_settings import set_selected_model
@@ -31,6 +50,18 @@ def chat_route():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+@common_bp.route('/model', methods=['GET', 'POST'])
+def model_route():
+    """Get or update the currently selected LLM model."""
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        name = data.get('model')
+        if name:
+            _save_model(name)
+            set_selected_model(name)
+        return jsonify(ok=True)
+    return jsonify({'model': _load_model()})
+
 @common_bp.route('/reminders', methods=['GET'])
 def reminders_route():
     rems = list_reminders()
@@ -45,9 +76,11 @@ def tasks_route():
 
 @common_bp.route('/memory', methods=['GET'])
 def memory_route():
-    messages = get_recent_messages()
-    data = [{'user': m['user'], 'assistant': m['assistant']} for m in messages]
-    return jsonify({'messages': data})
+    try:
+        messages = get_recent_messages()
+        return jsonify(messages)
+    except Exception as e:
+        return jsonify({"error": f"Memory error: {str(e)}"}), 500
 
 
 @common_bp.route('/memory/reset', methods=['POST'])

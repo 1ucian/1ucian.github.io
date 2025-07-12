@@ -16,6 +16,9 @@ const modelSelect = document.getElementById('model-select');
 // Previously used for typewriter effect
 
 function processThought(text, durationSec) {
+  if (!text || typeof text.indexOf !== 'function') {
+    return text || '';
+  }
   const start = text.indexOf('Thinking...');
   const end = text.indexOf('...done thinking');
   if (start !== -1 && end !== -1 && end > start) {
@@ -61,9 +64,17 @@ function fetchData() {
   fetch('/tasks').then(r => r.json()).then(d => {
     renderList(taskDiv, d.tasks || [], t => `${t.schedule} - ${t.description}`);
   }).catch(() => {});
-  fetch('/memory').then(r => r.json()).then(d => {
-    renderList(memoryDiv, d.messages || [], m => `${m.sender}: ${m.text}`);
-  }).catch(() => {});
+  fetch('/memory')
+    .then(res => res.json())
+    .then(data => {
+      console.log('Memory data:', data);
+      renderList(
+        memoryDiv,
+        data || [],
+        m => `${m.user}: ${m.assistant}`
+      );
+    })
+    .catch(() => {});
 }
 
 function applyTheme(theme) {
@@ -87,16 +98,24 @@ resetMemoryBtn.addEventListener('click', () => {
 
 function loadSettings() {
   const theme = localStorage.getItem('theme') || 'dark';
-  const model = localStorage.getItem('model') || 'gpt-4o';
   themeSelect.value = theme;
-  modelSelect.value = model;
   applyTheme(theme);
+  fetch('/model')
+    .then(r => r.json())
+    .then(cfg => {
+      document.querySelector('#model-select').value = cfg.model || '';
+    })
+    .catch(() => {});
 }
 
 function saveSettings() {
   localStorage.setItem('theme', themeSelect.value);
-  localStorage.setItem('model', modelSelect.value);
   applyTheme(themeSelect.value);
+  fetch('/model', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: modelSelect.value })
+  }).catch(() => {});
 }
 
 function sendMessage() {
@@ -108,11 +127,18 @@ function sendMessage() {
   fetch('/chat', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({query: text, model: localStorage.getItem('model') || 'gpt-4o'})
+    body: JSON.stringify({query: text})
   })
   .then(res => res.json())
   .then(data => {
     const duration = (Date.now() - start) / 1000;
+    if (data.error) {
+      if (data.error && data.error.indexOf('Qwen API') > -1) {
+        alert('⚠️ InsightMate backend LLM is offline. Start Ollama with:  `ollama serve` ');
+      }
+      addMessage('Error', data.error);
+      return;
+    }
     const msg = processThought(data.reply, duration);
     addMessage('Assistant', msg);
   })

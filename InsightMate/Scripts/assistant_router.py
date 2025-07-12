@@ -20,6 +20,7 @@ from calendar_reader import (
     list_events_for_day,
     search_events,
     create_event,
+    list_events_for_range,
 )
 from dateparser import parse as parse_date
 from reminder_scheduler import (
@@ -39,17 +40,18 @@ from memory_db import (
     get_recent_messages,
 )
 from summarizer import summarize_text
-from llm_client import chat_completion
-from llm_client import gpt as simple_gpt
-from user_settings import get_selected_model
+from llm_client import chat_completion, gpt
+from server_common import _load_model
 
 last_tool_output = {}
 
 TOOL_REGISTRY = {
     "search_email": lambda a: search_emails(a.get("query", "")),
-    "get_calendar": lambda a: (
-        list_events_for_day(parse_date(a.get("date", "today")).strftime("%Y-%m-%d"))
-        if parse_date(a.get("date", "today")) else "\u26a0\ufe0f Invalid date"
+    "get_calendar": lambda a: list_events_for_day(
+        parse_date(a.get("date", "today")).strftime("%Y-%m-%d")
+    ) if parse_date(a.get("date", "today")) else "\u26a0\ufe0f Invalid date",
+    "get_calendar_range": lambda a: list_events_for_range(
+        a.get("start"), a.get("end")
     ),
     "summarize": lambda a: summarize_text(
         last_tool_output.get(
@@ -57,10 +59,7 @@ TOOL_REGISTRY = {
             "\u26a0\ufe0f No previous tool output"
         )
     ),
-    "schedule_event": lambda a: create_event(
-        f"{a.get('title', 'Appointment')} {a.get('time', '21:00')}"
-    ),
-    "chat": lambda a: simple_gpt(a.get("prompt", "Say hello"))
+    "chat": lambda a: gpt(a.get("prompt", "Say hello"), a.get("model", _load_model()))
 }
 
 load_dotenv()
@@ -72,49 +71,49 @@ def _get_config():
 
 
 def plan_actions(user_prompt: str, model: str) -> list[dict]:
-    reasoning_mode = False
-    if "explain" in user_prompt.lower() or "how did you decide" in user_prompt.lower():
-        reasoning_mode = True
+    """Map the user's prompt to a list of tool actions."""
+    planning_prompt = f"""
+You are a planner. Your job is to convert the user's message into a JSON list of tool calls.
 
-    planning_prompt = f"""You are an AI planner. Based on the user's input, decide which tools to use. Output a JSON list.
+Available tools and arguments:
+- search_email        {{ "type": "search_email", "query": "<keywords or dates>" }}
+- get_calendar        {{ "type": "get_calendar", "date": "<relative or ISO date>" }}
+- get_calendar_range  {{ "type": "get_calendar_range", "start": "<start>", "end": "<end>" }}
+- summarize           {{ "type": "summarize" }}   # summarise last tool result
+- chat                {{ "type": "chat" }}        # plain conversation
 
-User prompt:
+Rules:
+1. ALWAYS think from the user’s exact words; do NOT assume hard-coded phrases.
+2. Choose 1–3 tools. If nothing fits, return [{"type":"chat"}].
+3. Output ONLY the JSON list — no extra text.
+
+User message:
 {user_prompt}
-
-Example response:
-[
-  {{ "type": "search_email", "query": "abfas" }},
-  {{ "type": "get_calendar", "date": "2025-07-10" }}
-]
 """
 
-    messages = [
-        {"role": "system", "content": "You're a tool planning assistant."},
-        {"role": "user", "content": planning_prompt},
-    ]
-    if reasoning_mode:
-        messages.insert(0, {"role": "system", "content": "Think step by step and explain what you are doing and why."})
+    response = chat_completion(
+        model,
+        [
+            {"role": "system", "content": "You're a smart assistant planner."},
+            {"role": "user", "content": planning_prompt},
+        ],
+    )
 
-    response = chat_completion(model, messages)
-
-    # Extract the first JSON block (starting with [ and ending with ])
-    import re
-    matches = re.findall(r"\[\s*{.*?}\s*\]", response, re.DOTALL)
-
-    if not matches:
+    import re, json
+    match = re.search(r"\[[\s\S]+?]", response)
+    if not match:
         print("\u26a0\ufe0f No valid JSON block found in planner output")
         print("Raw model response:", response)
+        if response.strip().startswith("\u26a0\ufe0f"):
+            return [{"type": "chat", "prompt": response}]
         return [{"type": "chat", "prompt": "I'm not sure what to do. Can you clarify?"}]
 
     try:
-        plan = json.loads(matches[0])
-        if not isinstance(plan, list) or not all("type" in step for step in plan):
-            raise ValueError("Invalid plan structure")
-        return plan
+        return json.loads(match.group(0))
     except Exception as e:
-        print("\u26a0\ufe0f Failed to parse planner JSON:", e)
-        print("Raw match:", matches[0])
-        return [{"type": "chat", "prompt": "I'm not sure what to do. Can you clarify?"}]
+        print("\u26a0\ufe0f Failed to parse JSON:", e)
+        print("Raw block:", match.group(0))
+        return [{"type": "chat", "prompt": "Invalid plan format."}]
 
 ONEDRIVE_KEYWORDS = {'onedrive', 'search', 'summarize', 'find', 'list'}
 EMAIL_KEYWORDS = {'gmail', 'email', 'inbox', 'mail'}
@@ -230,12 +229,8 @@ def gpt(prompt: str, model: str | None = None, cot_mode: bool = False) -> str:
         else:
             llm_name = llm
         return chat_completion(llm_name, messages)
-    llm_name = llm if llm else "qwen3:30b-a3b"
-    text = "\n".join(
-        f"{m['role'].capitalize()}: {m['content']}" for m in messages
-    )
-    out = subprocess.check_output(["ollama", "run", llm_name, text])
-    return out.decode().strip()
+    llm_name = llm if llm else _load_model()
+    return chat_completion(llm_name, messages)
 
 
 def _analysis_loop(prompt: str, plan: str, rounds: int = 3, model: str | None = None) -> str:
@@ -267,55 +262,84 @@ def generate_response(user_prompt: str, data: dict, cot_mode: bool) -> str:
 
 
 
-def plan_then_answer(user_prompt: str):
-    selected_model = get_selected_model()
+def plan_then_answer(user_prompt: str, model: str | None = None):
+    """Plan actions for ``user_prompt`` then execute them."""
+    global last_tool_output
+    selected_model = model or _load_model()
     prompt_clean = user_prompt.lower().strip()
 
-    # Handle small talk or casual prompts
-    if prompt_clean in ["hi", "hello", "hey", "how are you", "yo", "what's up", "sup", "good morning", "good evening"]:
+    # Casual conversation fallback
+    if prompt_clean in ["hi", "hello", "hey", "how are you", "yo", "what's up", "good afternoon"]:
         return chat_completion(selected_model, [{"role": "user", "content": user_prompt}])
 
-    # Attempt to plan actions
-    try:
-        actions = plan_actions(user_prompt, selected_model)
-    except Exception as e:
-        return "\u26a0\ufe0f Planning failed: " + str(e)
+    context_hint = ""
+    if last_tool_output:
+        context_hint = f"Last tool result:\n{json.dumps(last_tool_output)[:1000]}"
 
-    # Fallback if no actions returned
-    if not actions or len(actions) == 0:
+    try:
+        actions = plan_actions(f"{user_prompt}\n\n{context_hint}", selected_model)
+    except Exception as e:
+        return f"\u26a0\ufe0f Planning failed: {e}"
+
+    reflection = chat_completion(
+        selected_model,
+        [
+            {
+                "role": "system",
+                "content": "You are an assistant thinking about whether the planned actions make sense.",
+            },
+            {
+                "role": "user",
+                "content": f"User: {user_prompt}\nPlanned actions: {actions}\nRespond with either 'PROCEED' or suggest a better plan.",
+            },
+        ],
+    )
+    if "suggest" in reflection.lower():
+        revised = plan_actions(reflection, selected_model)
+        if revised:
+            actions = revised
+
+    if not actions:
         return "\u26a0\ufe0f I couldn't determine what action to take."
 
     results = {}
 
-    # Dynamically execute actions using TOOL_REGISTRY
     for action in actions:
-        if action.get("type") == "chat":
-            action["prompt"] = user_prompt
         action_type = action.get("type")
+        action["model"] = selected_model
         if action_type in TOOL_REGISTRY:
             try:
-                result = TOOL_REGISTRY[action_type](action)
-                results[action_type] = result
+                results[action_type] = TOOL_REGISTRY[action_type](action)
             except Exception as e:
                 results[action_type] = f"\u26a0\ufe0f Tool error: {str(e)}"
         else:
             results[action_type] = "\u26a0\ufe0f Unknown action type"
 
-    # Save results for follow-up summarization
-    for key, val in results.items():
-        last_tool_output[key] = val
-
-    return format_results(results)
+    last_tool_output.update(results)
+    reply = format_results(results)
+    if reply.lower().startswith("chat:"):
+        reply = reply.split(":", 1)[1].lstrip()
+    return reply
 
 
 def format_results(results):
-    reply = []
+    lines = []
     for k, v in results.items():
         if isinstance(v, list):
-            reply.append(f"{k}:\n" + "\n".join(str(i) for i in v))
+            for item in v:
+                if isinstance(item, dict):
+                    lines.append(
+                        f"{k}: " + " | ".join(f"{ik}: {iv}" for ik, iv in item.items())
+                    )
+                else:
+                    lines.append(f"{k}: {item}")
+        elif isinstance(v, dict):
+            lines.append(
+                f"{k}: " + " | ".join(f"{ik}: {iv}" for ik, iv in v.items())
+            )
         else:
-            reply.append(f"{k}: {v}")
-    return "\n\n".join(reply)
+            lines.append(f"{k}: {v}")
+    return "\n".join(lines)
 
 
 def _extract_minutes(text: str) -> Optional[int]:
@@ -333,7 +357,7 @@ def _extract_minutes(text: str) -> Optional[int]:
 
 
 def route(query: str) -> str:
-    selected_model = get_selected_model()
+    selected_model = _load_model()
     cot_mode = False
     q = query.lower()
     if "/think" in q:

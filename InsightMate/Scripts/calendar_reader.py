@@ -4,6 +4,7 @@ from googleapiclient.discovery import build
 
 from google_auth import get_credentials
 from dateparser.search import search_dates
+from dateparser import parse as parse_date
 
 CREATE_EVENT_PREFIXES = (
     'add event',
@@ -66,7 +67,57 @@ def list_events_for_day(day: int | str) -> list[dict]:
         start_time = e["start"].get("dateTime", e["start"].get("date"))
         end_time = e["end"].get("dateTime", e["end"].get("date"))
         output.append({"title": e.get("summary", ""), "start": start_time, "end": end_time})
-    return output
+    unique: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for ev in output:
+        key = (ev["title"], ev["start"])
+        if key not in seen:
+            unique.append(ev)
+            seen.add(key)
+    return unique
+
+
+def list_events_for_range(start_date: str, end_date: str) -> list[dict]:
+    """Return events for the given date range (inclusive)."""
+    creds = get_credentials()
+    service = build("calendar", "v3", credentials=creds)
+    start = parse_date(start_date)
+    end = parse_date(end_date)
+    if not start or not end:
+        return []
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=PACIFIC_TZ)
+    else:
+        start = start.astimezone(PACIFIC_TZ)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=PACIFIC_TZ)
+    else:
+        end = end.astimezone(PACIFIC_TZ)
+    events_result = (
+        service.events()
+        .list(
+            calendarId="primary",
+            timeMin=start.isoformat(),
+            timeMax=end.isoformat(),
+            singleEvents=True,
+            orderBy="startTime",
+        )
+        .execute()
+    )
+    events = events_result.get("items", [])
+    output = []
+    for e in events:
+        start_time = e["start"].get("dateTime", e["start"].get("date"))
+        end_time = e["end"].get("dateTime", e["end"].get("date"))
+        output.append({"title": e.get("summary", ""), "start": start_time, "end": end_time})
+    unique: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for ev in output:
+        key = (ev["title"], ev["start"])
+        if key not in seen:
+            unique.append(ev)
+            seen.add(key)
+    return unique
 
 
 def list_today_events() -> list[dict]:

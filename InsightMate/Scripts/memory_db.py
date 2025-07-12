@@ -112,15 +112,14 @@ def save_calendar_events(events: List[Dict[str, str]]) -> None:
     conn.close()
 
 
-def get_recent_messages(limit: int = 5) -> List[Dict[str, str]]:
-    """Return the most recent message pairs in chronological order."""
-    conn = _connect()
+def get_recent_messages(limit: int = 10) -> List[Dict[str, str]]:
+    """Return the most recent message pairs in newest-first order."""
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('SELECT user, assistant FROM messages ORDER BY id DESC LIMIT ?', (limit,))
     rows = c.fetchall()
     conn.close()
-    rows.reverse()
-    return [{'user': r[0], 'assistant': r[1]} for r in rows]
+    return [{"user": row[0], "assistant": row[1]} for row in rows]
 
 
 def save_reminder(text: str, run_time: str) -> None:
