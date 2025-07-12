@@ -1,5 +1,4 @@
 import requests
-import openai
 import json
 
 
@@ -10,6 +9,7 @@ def gpt(prompt: str, model: str) -> str:
 
 def chat_completion(model: str, messages: list[dict]) -> str:
     if model.startswith("gpt-"):
+        import openai
         return openai.ChatCompletion.create(
             model=model,
             messages=messages

@@ -45,8 +45,11 @@ def tasks_route():
 
 @common_bp.route('/memory', methods=['GET'])
 def memory_route():
-    messages = get_recent_messages()
-    return jsonify(messages)
+    try:
+        messages = get_recent_messages()
+        return jsonify(messages)
+    except Exception as e:
+        return jsonify({"error": f"Memory error: {str(e)}"}), 500
 
 
 @common_bp.route('/memory/reset', methods=['POST'])

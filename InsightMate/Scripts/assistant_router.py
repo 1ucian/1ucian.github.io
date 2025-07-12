@@ -41,17 +41,15 @@ from memory_db import (
 )
 from summarizer import summarize_text
 from llm_client import chat_completion
-from llm_client import gpt as simple_gpt
 from user_settings import get_selected_model
 
 last_tool_output = {}
 
 TOOL_REGISTRY = {
     "search_email": lambda a: search_emails(a.get("query", "")),
-    "get_calendar": lambda a: (
-        list_events_for_day(parse_date(a.get("date", "today")).strftime("%Y-%m-%d"))
-        if parse_date(a.get("date", "today")) else "\u26a0\ufe0f Invalid date"
-    ),
+    "get_calendar": lambda a: list_events_for_day(
+        parse_date(a.get("date", "today")).strftime("%Y-%m-%d")
+    ) if parse_date(a.get("date", "today")) else "\u26a0\ufe0f Invalid date",
     "get_calendar_range": lambda a: list_events_for_range(
         a.get("start"), a.get("end")
     ),
@@ -64,7 +62,7 @@ TOOL_REGISTRY = {
     "schedule_event": lambda a: create_event(
         f"{a.get('title', 'Appointment')} {a.get('time', '21:00')}"
     ),
-    "chat": lambda a: simple_gpt(a.get("prompt", "Say hello"), a.get("model", "qwen:30b-a3b"))
+    "chat": lambda a: a.get("prompt", "No response")
 }
 
 load_dotenv()
@@ -76,54 +74,37 @@ def _get_config():
 
 
 def plan_actions(user_prompt: str, model: str) -> list[dict]:
-    reasoning_mode = False
-    if "explain" in user_prompt.lower() or "how did you decide" in user_prompt.lower():
-        reasoning_mode = True
+    import re, json
+    from llm_client import chat_completion
 
-    planning_prompt = f"""You are an AI planner. Based on the user's input, decide which tools to use. Output a JSON list.
-
-IMPORTANT:
-- If the user asks anything about "calendar", "week", "day", or "event", prefer using "get_calendar".
-- Do not use "search_email" unless "email", "inbox", or a specific sender/keyword is mentioned.
-- Support ranges like "this week", "tomorrow", or "Monday to Friday" using get_calendar.
+    prompt = f"""You are an AI planner. Based on the user's input, decide which tools to use. Output a valid JSON list.
 
 User prompt:
 {user_prompt}
 
-Example response:
-[
-  {{ "type": "search_email", "query": "meeting notes" }},
-  {{ "type": "get_calendar", "date": "2025-07-10" }},
-  {{ "type": "get_calendar_range", "start": "2025-07-10", "end": "2025-07-17" }}
-]
+Examples:
+[{{"type": "get_calendar"}}, {{"type": "search_email", "query": "latest"}}]
 """
 
     messages = [
-        {"role": "system", "content": "You're a tool planning assistant."},
-        {"role": "user", "content": planning_prompt},
+        {"role": "system", "content": "You're a smart assistant planner."},
+        {"role": "user", "content": prompt},
     ]
-    if reasoning_mode:
-        messages.insert(0, {"role": "system", "content": "Think step by step and explain what you are doing and why."})
 
     response = chat_completion(model, messages)
 
-    # Extract the first JSON block (starting with [ and ending with ])
-    import re
-    matches = re.findall(r"\[\s*{.*?}\s*\]", response, re.DOTALL)
-
-    if not matches:
+    match = re.search(r"\[[\s\S]*?\]", response)
+    if not match:
         print("\u26a0\ufe0f No valid JSON block found in planner output")
         print("Raw model response:", response)
         return [{"type": "chat", "prompt": "I'm not sure what to do. Can you clarify?"}]
 
     try:
-        plan = json.loads(matches[0])
-        if not isinstance(plan, list) or not all("type" in step for step in plan):
-            raise ValueError("Invalid plan structure")
-        return plan
+        plan = json.loads(match.group(0))
+        return plan if isinstance(plan, list) else []
     except Exception as e:
         print("\u26a0\ufe0f Failed to parse planner JSON:", e)
-        print("Raw match:", matches[0])
+        print("Raw extracted block:", match.group(0))
         return [{"type": "chat", "prompt": "I'm not sure what to do. Can you clarify?"}]
 
 ONEDRIVE_KEYWORDS = {'onedrive', 'search', 'summarize', 'find', 'list'}
