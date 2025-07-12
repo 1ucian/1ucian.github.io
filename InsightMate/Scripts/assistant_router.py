@@ -59,9 +59,6 @@ TOOL_REGISTRY = {
             "\u26a0\ufe0f No previous tool output"
         )
     ),
-    "schedule_event": lambda a: create_event(
-        f"{a.get('title', 'Appointment')} {a.get('time', '21:00')}"
-    ),
     "chat": lambda a: gpt(a.get("prompt", "Say hello"), a.get("model", _load_model()))
 }
 
@@ -76,21 +73,22 @@ def _get_config():
 def plan_actions(user_prompt: str, model: str) -> list[dict]:
     """Map the user's prompt to a list of tool actions."""
     planning_prompt = f"""
-You are an AI planner. For the user's input, output ONLY a JSON list of tools.
+You are a planner. Your job is to convert the user's message into a JSON list of tool calls.
 
-IMPORTANT:
-- If the user mentions "calendar", "week", "day", or "event", prefer "get_calendar".
-- Only use "search_email" when "email" or a sender/keyword is mentioned.
-- Handle ranges like "this week" or "Monday to Friday" via "get_calendar_range".
+Available tools and arguments:
+- search_email        {{ "type": "search_email", "query": "<keywords or dates>" }}
+- get_calendar        {{ "type": "get_calendar", "date": "<relative or ISO date>" }}
+- get_calendar_range  {{ "type": "get_calendar_range", "start": "<start>", "end": "<end>" }}
+- summarize           {{ "type": "summarize" }}   # summarise last tool result
+- chat                {{ "type": "chat" }}        # plain conversation
 
-User prompt:
+Rules:
+1. ALWAYS think from the user’s exact words; do NOT assume hard-coded phrases.
+2. Choose 1–3 tools. If nothing fits, return [{"type":"chat"}].
+3. Output ONLY the JSON list — no extra text.
+
+User message:
 {user_prompt}
-
-Examples:
-[
-  {{"type": "search_email", "query": "lab results"}},
-  {{"type": "get_calendar", "date": "today"}}
-]
 """
 
     response = chat_completion(
@@ -274,23 +272,12 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     if prompt_clean in ["hi", "hello", "hey", "how are you", "yo", "what's up", "good afternoon"]:
         return chat_completion(selected_model, [{"role": "user", "content": user_prompt}])
 
-    # Handle follow-ups that rely on prior output
-    if prompt_clean in ["all of them", "entire week", "show me", "summarize", "titles"]:
-        if "email" in last_tool_output:
-            if "titles" in prompt_clean:
-                return "\n".join(e.get("subject", "") for e in last_tool_output["email"])
-            if "summarize" in prompt_clean:
-                return summarize_text(last_tool_output["email"])
-            return format_results({"email": last_tool_output["email"]})
-        if "calendar" in last_tool_output or "get_calendar" in last_tool_output or "get_calendar_range" in last_tool_output:
-            data = last_tool_output.get("calendar") or last_tool_output.get("get_calendar") or last_tool_output.get("get_calendar_range")
-            if "summarize" in prompt_clean:
-                return summarize_text(data)
-            return format_results({"calendar": data})
-        return "\u26a0\ufe0f No previous content available."
+    context_hint = ""
+    if last_tool_output:
+        context_hint = f"Last tool result:\n{json.dumps(last_tool_output)[:1000]}"
 
     try:
-        actions = plan_actions(user_prompt, selected_model)
+        actions = plan_actions(f"{user_prompt}\n\n{context_hint}", selected_model)
     except Exception as e:
         return f"\u26a0\ufe0f Planning failed: {e}"
 
@@ -329,7 +316,10 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
             results[action_type] = "\u26a0\ufe0f Unknown action type"
 
     last_tool_output.update(results)
-    return format_results(results)
+    reply = format_results(results)
+    if reply.lower().startswith("chat:"):
+        reply = reply.split(":", 1)[1].lstrip()
+    return reply
 
 
 def format_results(results):
