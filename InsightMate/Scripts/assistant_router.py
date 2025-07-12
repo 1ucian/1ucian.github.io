@@ -117,6 +117,8 @@ Rules:
 • If user adds an event like “add 5 pm dinner”, emit **schedule_event**.
 • If user says “change 5 pm today”, emit get_calendar + schedule_event (update).
 • If user asks follow-up (“titles”, “summary”, “all of them”), emit summarize.
+• If user says "list calendar" or "calendar events today":
+  output [{ "type":"get_calendar","date":"today" }]
 
 Only output the JSON array. No <think> tags.
 User message:
@@ -253,7 +255,7 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     prompt_clean = user_prompt.lower().strip()
 
     FOLLOW = prompt_clean
-    if last_tool_output and FOLLOW in {"titles", "summary", "summarize", "all of them", "entire week"}:
+    if last_tool_output and FOLLOW in {"titles", "all of them", "entire week"}:
         if "email" in last_tool_output:
             emails = last_tool_output["email"]
             if "titles" in FOLLOW:
@@ -262,6 +264,12 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
         if "calendar" in last_tool_output:
             events = last_tool_output["calendar"]
             return summarize_text(events)
+
+    if last_tool_output and prompt_clean.startswith(("summarize", "summary")):
+        for key in ("email", "search_email", "calendar", "get_calendar"):
+            if key in last_tool_output:
+                return summarize_text(last_tool_output[key])
+        return "\u26a0\ufe0f Nothing to summarize."
 
     # Casual conversation fallback
     if prompt_clean in ["hi", "hello", "hey", "how are you", "yo", "what's up", "good afternoon"]:
@@ -316,7 +324,14 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
             results[t] = f"\u26a0\ufe0f Unknown tool '{t}'"
             continue
         try:
-            results[t] = TOOL_REGISTRY[t](action)
+            out = TOOL_REGISTRY[t](action)
+            results[t] = out
+
+            # store unified aliases for follow-ups
+            if t == "search_email":
+                results["email"] = out
+            if t in {"get_calendar", "get_calendar_range"}:
+                results["calendar"] = out
         except Exception as e:
             results[t] = f"\u26a0\ufe0f {t} error: {e}"
 
