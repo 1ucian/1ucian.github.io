@@ -168,9 +168,11 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
 
 def _normalise(action: dict) -> dict:
     """Ensure planner actions use the 'type' key and clean stray quotes."""
+    if not isinstance(action, dict):
+        return {}
     cleaned = {}
     for k, v in action.items():
-        key = k.strip().strip('"').strip("'")
+        key = str(k).strip().strip('"').strip("'")
         cleaned[key] = v
     action = cleaned
     if "type" in action:
@@ -335,10 +337,19 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     except Exception as e:
         return f"\u26a0\ufe0f Planning failed: {e}"
     logging.info("PLAN %s", actions)
-    actions = [_normalise(a) for a in actions]
+    normalised = []
+    for a in actions:
+        try:
+            a = _normalise(a)
+        except Exception as e:
+            logging.error("normalise failed: %s", e)
+            continue
+        normalised.append(a)
+    actions = normalised
 
     for a in actions:
         if "type" not in a:
+            logging.error("missing type in action: %s", a)
             return "\u26a0\ufe0f Planner output lacked 'type'. Please retry."
 
     if actions == [{"type": "chat"}]:
