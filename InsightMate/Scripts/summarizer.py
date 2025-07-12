@@ -15,4 +15,4 @@ def summarize_text(obj):
     else:
         text = str(obj)
     prompt = "Write one coherent paragraph summarizing:\n" + text
-    return gpt(prompt, model="qwen3:72b-a14b")
+    return gpt(prompt, model="qwen3:30b-a3b")

@@ -18,6 +18,7 @@ from calendar_reader import (
     create_event,
 )
 from dateparser import parse as parse_date
+from date_utils import date_keyword, today_pt
 from reminder_scheduler import (
     schedule as schedule_reminder,
     schedule_air_quality,
@@ -75,8 +76,22 @@ TOOL_REGISTRY = {
         )
     ),
     "chat": lambda a: gpt(a.get("prompt", ""), a["model"]),
-    "schedule_event": lambda a: create_event(f"{a.get('title', '')} at {a.get('time', '')}")
+    "schedule_event": lambda a: _schedule(a)
 }
+
+def _schedule(a):
+    date_str = a.get("date")
+    when = a.get("time", "17:00")
+    if date_str:
+        parsed = parse_date(date_str)
+        if parsed:
+            date = parsed.date()
+        else:
+            date = today_pt()
+    else:
+        date = today_pt()
+    title = a.get("title", "Appointment")
+    return create_event(f"{title} {date} {when}")
 
 load_dotenv()
 
@@ -88,29 +103,24 @@ def _get_config():
 
 def plan_actions(user_prompt: str, model: str) -> list[dict]:
     """Map the user's prompt to a list of tool actions."""
-    planning_prompt = (
-        "You are a planner. Convert the user’s message into a JSON list of tools.\n"
-        "\n"
-        "Available tools:\n"
-        "- search_email        { \"type\": \"search_email\", \"query\": \"<keywords>\" }\n"
-        "- get_calendar        { \"type\": \"get_calendar\", \"date\": \"<date>\" }\n"
-        "- get_calendar_range  { \"type\": \"get_calendar_range\", \"start\": \"<start>\", \"end\": \"<end>\" }\n"
-        "- summarize           { \"type\": \"summarize\" }\n"
-        "- chat                { \"type\": \"chat\" }\n"
-        "\n"
-        "RULES:\n"
-        "1. Think from the user text only; no hard-coded commands.\n"
-        "2. Return 1-3 tools. If nothing fits, return [ {\"type\":\"chat\"} ].\n"
-        "3. Output **only** the JSON list, no commentary.\n"
-        "- If user says \"today's emails\": {\"type\":\"search_email\",\"query\":\"today\"}\n"
-        "- If user says \"emails from <keyword>\": use that exact keyword.\n"
-        "- If user asks \"calendar this week\": {\"type\":\"get_calendar_range\",\"start\":\"today\",\"end\":\"+7d\"}\n"
-        "- If user says 'add <title> at <time>' or 'schedule <title> <time>':"
-        "  [{ \"type\":\"schedule_event\", \"title\":\"<title>\", \"time\":\"<time>\" }]\n"
-        "\n"
-        "User message:\n"
-        f"{user_prompt}"
-    )
+    planning_prompt = f"""
+You are a tool-planning agent. For the **user message** below, output a VALID JSON list (no commentary) of 1-N actions.
+Available tools:
+- search_email  {{ "query": "<keywords>" }}
+- get_calendar   {{ "date": "<YYYY-MM-DD|today|yesterday>" }}
+- get_calendar_range {{ "start": "<YYYY-MM-DD|today>", "end": "<YYYY-MM-DD|+7d>" }}
+- schedule_event {{ "title":"<text>", "time":"<HH:MM>" }}
+- summarize      {{ "source":"email|calendar" }}
+Rules:
+• If user says “today / yesterday / tomorrow”, map to exact dates in Pacific Time (UTC-07).
+• If user adds an event like “add 5 pm dinner”, emit **schedule_event**.
+• If user says “change 5 pm today”, emit get_calendar + schedule_event (update).
+• If user asks follow-up (“titles”, “summary”, “all of them”), emit summarize.
+
+Only output the JSON array. No <think> tags.
+User message:
+{user_prompt}
+"""
 
     response = chat_completion(
         model,
@@ -230,15 +240,16 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     selected_model = get_selected_model()
     prompt_clean = user_prompt.lower().strip()
 
-    if last_tool_output and prompt_clean in FOLLOW_UPS:
-        if "email" in last_tool_output or "search_email" in last_tool_output:
-            emails = last_tool_output.get("search_email") or last_tool_output["email"]
-            if "titles" in prompt_clean:
+    FOLLOW = prompt_clean
+    if last_tool_output and FOLLOW in {"titles", "summary", "summarize", "all of them", "entire week"}:
+        if "email" in last_tool_output:
+            emails = last_tool_output["email"]
+            if "titles" in FOLLOW:
                 return "\n".join(e["subject"] for e in emails)
             return summarize_text(emails)
         if "calendar" in last_tool_output:
-            cal = last_tool_output["calendar"]
-            return summarize_text(cal)
+            events = last_tool_output["calendar"]
+            return summarize_text(events)
 
     # Casual conversation fallback
     if prompt_clean in ["hi", "hello", "hey", "how are you", "yo", "what's up", "good afternoon"]:
@@ -256,7 +267,7 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
         actions = plan_actions(user_prompt + context_hint, selected_model)
     except Exception as e:
         return f"\u26a0\ufe0f Planning failed: {e}"
-    logging.info("Planned actions: %s", actions)
+    logging.info("PLAN %s", actions)
 
     reflection = chat_completion(
         selected_model,
@@ -286,39 +297,39 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     for action in actions:
         if action.get("type") == "chat":
             action.setdefault("prompt", user_prompt)
-        action_type = action.get("type")
+        t = action.get("type")
         action["model"] = selected_model
-        if action_type in TOOL_REGISTRY:
+        if t in TOOL_REGISTRY:
             try:
-                results[action_type] = TOOL_REGISTRY[action_type](action)
+                results[t] = TOOL_REGISTRY[t](action)
             except Exception as e:
-                results[action_type] = f"\u26a0\ufe0f Tool error: {str(e)}"
+                results[t] = f"\u26a0\ufe0f {t} error: {e}"
         else:
-            results[action_type] = "\u26a0\ufe0f Unknown action type"
+            results[t] = "\u26a0\ufe0f Unknown action type"
 
-    logging.info("Tool results keys: %s", list(results.keys()))
+    logging.info("RESULT KEYS %s", list(results.keys()))
 
-    last_tool_output.update(results)
+    last_tool_output = results
     reply = format_results(results)
     if reply.lower().startswith("chat:"):
         reply = reply.split(":", 1)[1].lstrip()
     return reply
 
 
-def format_results(results):
+def format_results(res):
     out = []
-    for kind, items in results.items():
-        if isinstance(items, list):
-            for it in items:
-                subj = it.get("subject") or it.get("title", "")
-                when = it.get("start", "")[:16]
-                out.append(f"\u2022 {subj}  {when}")
-        elif isinstance(items, dict):
-            subj = items.get("subject") or items.get("title", "")
-            when = items.get("start", "")[:16]
-            out.append(f"\u2022 {subj}  {when}")
+    for k, v in res.items():
+        if isinstance(v, list):
+            for item in v:
+                subj = item.get("subject") or item.get("title", "")
+                when = item.get("start", "")[:16]
+                out.append(f"\u2022 {subj} {when}")
+        elif isinstance(v, dict):
+            subj = v.get("subject") or v.get("title", "")
+            when = v.get("start", "")[:16]
+            out.append(f"\u2022 {subj} {when}")
         else:
-            out.append(str(items))
+            out.append(str(v))
     return "\n".join(out)
 
 

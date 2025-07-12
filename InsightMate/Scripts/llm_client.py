@@ -6,7 +6,7 @@ import logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 BASE_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-MODEL_NAME = os.getenv("LLM_MODEL", "qwen3:72b-a14b")
+MODEL_NAME = os.getenv("LLM_MODEL", "qwen3:30b-a3b")
 
 try:
     requests.get(BASE_URL, timeout=3)
