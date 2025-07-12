@@ -40,7 +40,7 @@ from memory_db import (
     get_recent_messages,
 )
 from summarizer import summarize_text
-from llm_client import chat_completion
+from llm_client import chat_completion, gpt
 from user_settings import get_selected_model
 
 last_tool_output = {}
@@ -62,7 +62,7 @@ TOOL_REGISTRY = {
     "schedule_event": lambda a: create_event(
         f"{a.get('title', 'Appointment')} {a.get('time', '21:00')}"
     ),
-    "chat": lambda a: a.get("prompt", "No response")
+    "chat": lambda a: gpt(a.get("prompt", "Say hello"), a.get("model", "qwen:30b-a3b"))
 }
 
 load_dotenv()
@@ -75,22 +75,31 @@ def _get_config():
 
 def plan_actions(user_prompt: str, model: str) -> list[dict]:
     """Map the user's prompt to a list of tool actions."""
-    prompt = f"""You are a planner. Based on the user's message, output a JSON list of tools to use.
+    planning_prompt = f"""
+You are an AI planner. For the user's input, output ONLY a JSON list of tools.
 
-User:
+IMPORTANT:
+- If the user mentions "calendar", "week", "day", or "event", prefer "get_calendar".
+- Only use "search_email" when "email" or a sender/keyword is mentioned.
+- Handle ranges like "this week" or "Monday to Friday" via "get_calendar_range".
+
+User prompt:
 {user_prompt}
 
-Example output:
+Examples:
 [
-  {{ "type": "search_email", "query": "lab results" }},
-  {{ "type": "get_calendar", "date": "today" }}
+  {{"type": "search_email", "query": "lab results"}},
+  {{"type": "get_calendar", "date": "today"}}
 ]
 """
 
-    response = chat_completion(model, [
-        {"role": "system", "content": "You're a planner that maps user prompts to structured actions."},
-        {"role": "user", "content": prompt},
-    ])
+    response = chat_completion(
+        model,
+        [
+            {"role": "system", "content": "You're a smart assistant planner."},
+            {"role": "user", "content": planning_prompt},
+        ],
+    )
 
     import re, json
     match = re.search(r"\[[\s\S]+?]", response)
@@ -267,17 +276,43 @@ def plan_then_answer(user_prompt: str, model: str = "qwen:30b-a3b"):
     if prompt_clean in ["hi", "hello", "hey", "how are you", "yo", "what's up", "good afternoon"]:
         return chat_completion(selected_model, [{"role": "user", "content": user_prompt}])
 
-    # Follow-up summarization or formatting requests
-    if "summarize" in prompt_clean or "readable" in prompt_clean or "titles" in prompt_clean:
-        for key in ["email", "calendar"]:
-            if key in last_tool_output:
-                return summarize_text(last_tool_output[key])
-        return "\u26a0\ufe0f No previous content available to summarize or format."
+    # Handle follow-ups that rely on prior output
+    if prompt_clean in ["all of them", "entire week", "show me", "summarize", "titles"]:
+        if "email" in last_tool_output:
+            if "titles" in prompt_clean:
+                return "\n".join(e.get("subject", "") for e in last_tool_output["email"])
+            if "summarize" in prompt_clean:
+                return summarize_text(last_tool_output["email"])
+            return format_results({"email": last_tool_output["email"]})
+        if "calendar" in last_tool_output or "get_calendar" in last_tool_output or "get_calendar_range" in last_tool_output:
+            data = last_tool_output.get("calendar") or last_tool_output.get("get_calendar") or last_tool_output.get("get_calendar_range")
+            if "summarize" in prompt_clean:
+                return summarize_text(data)
+            return format_results({"calendar": data})
+        return "\u26a0\ufe0f No previous content available."
 
     try:
         actions = plan_actions(user_prompt, selected_model)
     except Exception as e:
         return f"\u26a0\ufe0f Planning failed: {e}"
+
+    reflection = chat_completion(
+        selected_model,
+        [
+            {
+                "role": "system",
+                "content": "You are an assistant thinking about whether the planned actions make sense.",
+            },
+            {
+                "role": "user",
+                "content": f"User: {user_prompt}\nPlanned actions: {actions}\nRespond with either 'PROCEED' or suggest a better plan.",
+            },
+        ],
+    )
+    if "suggest" in reflection.lower():
+        revised = plan_actions(reflection, selected_model)
+        if revised:
+            actions = revised
 
     if not actions:
         return "\u26a0\ufe0f I couldn't determine what action to take."
