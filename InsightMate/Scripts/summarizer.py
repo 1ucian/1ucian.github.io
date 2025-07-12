@@ -1,5 +1,5 @@
 from llm_client import gpt
-from server_common import _load_model
+from user_settings import get_selected_model
 import json
 
 
@@ -15,6 +15,10 @@ def summarize_text(obj):
     elif isinstance(obj, dict):
         text = json.dumps(obj, indent=2)[:4000]
     else:
+        text = str(text_or_list)
+    prompt = "Summarize this:\n" + text
+    model = get_selected_model()
+    return gpt(prompt, model=model)
         text = str(obj)
     prompt = "Write a single coherent paragraph summarising this:\n" + text
     return gpt(prompt, model="qwen3:30b-a3b")
