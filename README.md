@@ -24,6 +24,8 @@ This repository contains the source for my personal site as well as **InsightMat
 
 6. Open `http://<host>:5000/` in your browser (replace `<host>` with your computer's address). The server listens on all network interfaces so it can be reached from other devices on the same network.
 
+By default InsightMate uses the local **qwen3:30b-a3b** model. You can switch models from the Settings panel in the web UI.
+
 Conversation history, unread email summaries and calendar events are stored locally in `memory.db`. Settings are written to `config.json`.
 
 ### Recent Updates

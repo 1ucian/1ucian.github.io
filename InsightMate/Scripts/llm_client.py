@@ -4,7 +4,7 @@ import requests
 import logging
 
 BASE_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-MODEL_NAME = os.getenv("LLM_MODEL", "qwen3:72b-a14b")
+MODEL_NAME = os.getenv("LLM_MODEL", "qwen3:30b-a3b")
 
 # Backwards compatibility
 OLLAMA_URL = BASE_URL

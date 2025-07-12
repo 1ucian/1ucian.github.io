@@ -4,7 +4,7 @@ import os
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config.json')
 DEFAULT_CONFIG = {
     'api_key': '',
-    'llm': 'qwen3:72b-a14b',
+    'llm': 'qwen3:30b-a3b',
     'theme': 'dark',
     'prompt': (
         "You are InsightMate, a highly intelligent, concise, "
