@@ -5,6 +5,7 @@ from typing import Optional
 import requests
 import openai
 import json
+import difflib
 from dotenv import load_dotenv
 from config import load_config, get_api_key, get_llm, get_prompt
 
@@ -31,6 +32,15 @@ from memory_db import (
 from summarizer import summarize_text
 from llm_client import chat_completion, gpt
 from server_common import _load_model
+
+
+def _is_relevant(prior: dict, query: str) -> bool:
+    """Return True if user query mentions keywords from prior tool output."""
+    if not prior:
+        return False
+    text = json.dumps(prior).lower()[:800]
+    tokens = [w for w in query.lower().split() if len(w) > 3][:4]
+    return any(t in text for t in tokens)
 
 last_tool_output = {}
 
@@ -210,12 +220,16 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     if prompt_clean in ["hi", "hello", "hey", "how are you", "yo", "what's up", "good afternoon"]:
         return chat_completion(selected_model, [{"role": "user", "content": user_prompt}])
 
+    # Clean context if irrelevant
+    if not _is_relevant(last_tool_output, user_prompt):
+        last_tool_output = {}
+
     context_hint = ""
     if last_tool_output:
-        context_hint = f"Last tool result:\n{json.dumps(last_tool_output)[:1000]}"
+        context_hint = f"\n\nLast tool result:\n{json.dumps(last_tool_output)[:1000]}"
 
     try:
-        actions = plan_actions(f"{user_prompt}\n\n{context_hint}", selected_model)
+        actions = plan_actions(user_prompt + context_hint, selected_model)
     except Exception as e:
         return f"\u26a0\ufe0f Planning failed: {e}"
 
