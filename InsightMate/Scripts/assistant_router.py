@@ -8,6 +8,7 @@ import json
 import difflib
 import logging
 import time
+import re
 from dotenv import load_dotenv
 from config import load_config, get_api_key, get_llm, get_prompt
 
@@ -273,6 +274,16 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     global last_tool_output
     selected_model = get_selected_model()
     prompt_clean = user_prompt.lower().strip()
+
+    if re.search(r"\b(list|show|get)\s+emails?\b", prompt_clean):
+        query_word = "today"
+        if "yesterday" in prompt_clean:
+            query_word = "yesterday"
+        elif "today" in prompt_clean:
+            query_word = "today"
+        emails = search_emails(query_word)
+        last_tool_output = {"email": emails}
+        return format_results({"email": emails})
 
     FOLLOW = prompt_clean
     if last_tool_output and FOLLOW in {"titles", "all of them", "entire week"}:
