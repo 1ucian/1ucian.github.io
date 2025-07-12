@@ -3,6 +3,8 @@ import json
 import requests
 import logging
 
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
 BASE_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 MODEL_NAME = os.getenv("LLM_MODEL", "qwen3:72b-a14b")
 
@@ -36,7 +38,9 @@ def chat_completion(model: str, messages: list[dict]) -> str:
             f"{BASE_URL}/api/chat", json=payload, stream=True, timeout=120
         )
         response.raise_for_status()
-        return response.json()["message"]["content"].strip()
+    except requests.HTTPError as e:
+        logging.error("LLM %s", e)
+        return f"\u26a0\ufe0f LLM error: {e.response.status_code}"
     except requests.exceptions.RequestException as e:
         logging.error("LLM call failed: %s", e)
         if isinstance(e, requests.HTTPError) and e.response is not None and e.response.status_code == 404:
@@ -45,3 +49,4 @@ def chat_completion(model: str, messages: list[dict]) -> str:
                 f"Run `ollama pull {model}` or choose another model in Settings."
             )
         return f"\u26a0\ufe0f LLM error: {e}"
+    return response.json()["message"]["content"].strip()

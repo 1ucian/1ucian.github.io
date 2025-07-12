@@ -2,11 +2,17 @@ from llm_client import gpt
 from server_common import _load_model
 
 
-def summarize_text(text_or_list):
-    """Summarize a string or list of items using Qwen."""
-    if isinstance(text_or_list, list):
-        text = "\n".join(str(item) for item in text_or_list)
+def summarize_text(obj):
+    """Summarize ``obj`` using Qwen. Lists are converted to bullet text."""
+    if isinstance(obj, list):
+        bulk = "\n".join(
+            (it.get("subject") or it.get("title", "")) + " "
+            + (it.get("snippet", "")[:120])
+            for it in obj
+            if isinstance(it, dict)
+        )
+        text = bulk
     else:
-        text = str(text_or_list)
-    prompt = "Summarize this:\n" + text
-    return gpt(prompt, model=_load_model())
+        text = str(obj)
+    prompt = "Write one coherent paragraph summarizing:\n" + text
+    return gpt(prompt, model="qwen3:72b-a14b")

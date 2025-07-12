@@ -15,6 +15,7 @@ from gmail_reader import search_emails
 from calendar_reader import (
     list_events_for_day,
     list_events_for_range,
+    create_event,
 )
 from dateparser import parse as parse_date
 from reminder_scheduler import (
@@ -34,6 +35,7 @@ from memory_db import (
 from summarizer import summarize_text
 from llm_client import chat_completion, gpt
 from server_common import _load_model
+from user_settings import get_selected_model
 
 
 def _is_relevant(prior: dict, query: str) -> bool:
@@ -44,7 +46,17 @@ def _is_relevant(prior: dict, query: str) -> bool:
     tokens = [w for w in query.lower().split() if len(w) > 3][:4]
     return any(t in text for t in tokens)
 
-FOLLOW_UPS = {"titles", "summarize", "all of them", "entire week"}
+FOLLOW_UPS = {
+    "titles",
+    "summarize",
+    "summary",
+    "paragraph",
+    "readable",
+    "all of them",
+    "entire week",
+    "what about yesterday",
+    "yesterday",
+}
 
 last_tool_output = {}
 
@@ -62,7 +74,8 @@ TOOL_REGISTRY = {
             "\u26a0\ufe0f No previous tool output"
         )
     ),
-    "chat": lambda a: gpt(a["prompt"], a["model"])
+    "chat": lambda a: gpt(a.get("prompt", ""), a["model"]),
+    "schedule_event": lambda a: create_event(f"{a.get('title', '')} at {a.get('time', '')}")
 }
 
 load_dotenv()
@@ -92,6 +105,8 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
         "- If user says \"today's emails\": {\"type\":\"search_email\",\"query\":\"today\"}\n"
         "- If user says \"emails from <keyword>\": use that exact keyword.\n"
         "- If user asks \"calendar this week\": {\"type\":\"get_calendar_range\",\"start\":\"today\",\"end\":\"+7d\"}\n"
+        "- If user says 'add <title> at <time>' or 'schedule <title> <time>':"
+        "  [{ \"type\":\"schedule_event\", \"title\":\"<title>\", \"time\":\"<time>\" }]\n"
         "\n"
         "User message:\n"
         f"{user_prompt}"
@@ -212,7 +227,7 @@ def generate_response(user_prompt: str, data: dict, cot_mode: bool) -> str:
 def plan_then_answer(user_prompt: str, model: str | None = None):
     """Plan actions for ``user_prompt`` then execute them."""
     global last_tool_output
-    selected_model = model or _load_model()
+    selected_model = get_selected_model()
     prompt_clean = user_prompt.lower().strip()
 
     if last_tool_output and prompt_clean in FOLLOW_UPS:
@@ -241,6 +256,7 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
         actions = plan_actions(user_prompt + context_hint, selected_model)
     except Exception as e:
         return f"\u26a0\ufe0f Planning failed: {e}"
+    logging.info("Planned actions: %s", actions)
 
     reflection = chat_completion(
         selected_model,
@@ -268,6 +284,8 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     results = {}
 
     for action in actions:
+        if action.get("type") == "chat":
+            action.setdefault("prompt", user_prompt)
         action_type = action.get("type")
         action["model"] = selected_model
         if action_type in TOOL_REGISTRY:
@@ -277,6 +295,8 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
                 results[action_type] = f"\u26a0\ufe0f Tool error: {str(e)}"
         else:
             results[action_type] = "\u26a0\ufe0f Unknown action type"
+
+    logging.info("Tool results keys: %s", list(results.keys()))
 
     last_tool_output.update(results)
     reply = format_results(results)
