@@ -1,6 +1,7 @@
 """Minimal Flask server for the InsightMate web app."""
 
 import os
+import requests
 
 from flask import Flask
 from dotenv import load_dotenv
@@ -22,5 +23,10 @@ register_common(app)
 
 
 if __name__ == "__main__":
+    from llm_client import BASE_URL
+    try:
+        requests.get(BASE_URL)
+    except Exception:
+        print("\u26a0\ufe0f Ollama is not running. Start it with `ollama run qwen:30b`.")
     # Listen on all interfaces so the web client can connect locally.
     app.run(host="0.0.0.0", port=5000)

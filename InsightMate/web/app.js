@@ -16,6 +16,9 @@ const modelSelect = document.getElementById('model-select');
 // Previously used for typewriter effect
 
 function processThought(text, durationSec) {
+  if (!text || typeof text.indexOf !== 'function') {
+    return text || '';
+  }
   const start = text.indexOf('Thinking...');
   const end = text.indexOf('...done thinking');
   if (start !== -1 && end !== -1 && end > start) {

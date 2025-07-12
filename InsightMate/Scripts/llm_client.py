@@ -1,5 +1,8 @@
+import os
 import requests
 import json
+
+BASE_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 
 
 def gpt(prompt: str, model: str) -> str:
@@ -15,12 +18,17 @@ def chat_completion(model: str, messages: list[dict]) -> str:
             messages=messages
         )["choices"][0]["message"]["content"].strip()
 
-    response = requests.post(
-        "http://localhost:11434/api/chat",
-        json={"model": model, "messages": messages, "stream": True},
-        stream=True
-    )
-    response.raise_for_status()
+    try:
+        response = requests.post(
+            f"{BASE_URL}/api/chat",
+            json={"model": model, "messages": messages, "stream": True},
+            stream=True
+        )
+        response.raise_for_status()
+    except Exception as e:
+        if "404" in str(e):
+            return "\u26a0\ufe0f Qwen API endpoint not found. Is Ollama running?"
+        raise
 
     full_reply = ""
     for line in response.iter_lines():
