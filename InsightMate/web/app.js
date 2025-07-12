@@ -133,7 +133,7 @@ function sendMessage() {
   .then(data => {
     const duration = (Date.now() - start) / 1000;
     if (data.error) {
-      if (data.error && data.error.indexOf('Qwen API') > -1) {
+      if (data.error && data.error.indexOf('LLM error') > -1) {
         alert('⚠️ InsightMate backend LLM is offline. Start Ollama with:  `ollama serve` ');
       }
       addMessage('Error', data.error);

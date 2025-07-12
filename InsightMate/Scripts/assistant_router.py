@@ -44,7 +44,7 @@ def _is_relevant(prior: dict, query: str) -> bool:
     tokens = [w for w in query.lower().split() if len(w) > 3][:4]
     return any(t in text for t in tokens)
 
-FOLLOW_UP_KEYWORDS = {"all of them", "entire week", "titles", "summarize", "readable"}
+FOLLOW_UPS = {"titles", "summarize", "all of them", "entire week"}
 
 last_tool_output = {}
 
@@ -62,7 +62,7 @@ TOOL_REGISTRY = {
             "\u26a0\ufe0f No previous tool output"
         )
     ),
-    "chat": lambda a: gpt(a.get("prompt", "Say hello"), a.get("model", _load_model()))
+    "chat": lambda a: gpt(a["prompt"], a["model"])
 }
 
 load_dotenv()
@@ -106,32 +106,12 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
     )
 
     import re, json
-    match = re.search(r"\[[\s\S]+?]", response)
+    match = re.search(r"\[[\s\S]*?]", response)
     if not match:
-        log_path = os.path.join("logs", f"planner_{int(time.time())}.txt")
-        try:
-            os.makedirs("logs", exist_ok=True)
-            with open(log_path, "w") as f:
-                f.write(response)
-        except Exception:
-            pass
-        logging.error("No JSON block found in planner output. Saved to %s", log_path)
-        if response.strip().startswith("\u26a0\ufe0f"):
-            return [{"type": "chat", "prompt": response}]
-        return [{"type": "chat", "prompt": "I'm not sure what to do. Can you clarify?"}]
-
-    try:
-        return json.loads(match.group(0))
-    except Exception as e:
-        log_path = os.path.join("logs", f"planner_{int(time.time())}.txt")
-        try:
-            os.makedirs("logs", exist_ok=True)
-            with open(log_path, "w") as f:
-                f.write(match.group(0))
-        except Exception:
-            pass
-        logging.error("Failed to parse planner JSON: %s. Saved to %s", e, log_path)
-        return [{"type": "chat", "prompt": "Invalid plan format."}]
+        print("\u26a0\ufe0f Planner returned no JSON. Raw:", response[:300])
+        return [{"type": "chat", "prompt": "I’m not sure what to do. Can you clarify?"}]
+    plan = json.loads(match.group(0))
+    return plan if isinstance(plan, list) else []
 
 
 
@@ -235,23 +215,19 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     selected_model = model or _load_model()
     prompt_clean = user_prompt.lower().strip()
 
+    if last_tool_output and prompt_clean in FOLLOW_UPS:
+        if "email" in last_tool_output or "search_email" in last_tool_output:
+            emails = last_tool_output.get("search_email") or last_tool_output["email"]
+            if "titles" in prompt_clean:
+                return "\n".join(e["subject"] for e in emails)
+            return summarize_text(emails)
+        if "calendar" in last_tool_output:
+            cal = last_tool_output["calendar"]
+            return summarize_text(cal)
+
     # Casual conversation fallback
     if prompt_clean in ["hi", "hello", "hey", "how are you", "yo", "what's up", "good afternoon"]:
         return chat_completion(selected_model, [{"role": "user", "content": user_prompt}])
-
-    if last_tool_output and prompt_clean in FOLLOW_UP_KEYWORDS:
-        if "email" in last_tool_output:
-            emails = last_tool_output["email"]
-            if "titles" in prompt_clean:
-                return "\n".join(e.get("subject", "") for e in emails)
-            if "summarize" in prompt_clean or "readable" in prompt_clean:
-                return summarize_text(emails)
-            return format_results({"email": emails})
-        if "calendar" in last_tool_output:
-            events = last_tool_output["calendar"]
-            if "summarize" in prompt_clean:
-                return summarize_text(events)
-            return format_results({"calendar": events})
 
     # Clean context if irrelevant
     if not _is_relevant(last_tool_output, user_prompt):
@@ -279,6 +255,8 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
             },
         ],
     )
+    if reflection.lower().startswith("<think"):
+        reflection = "PROCEED"
     if "suggest" in reflection.lower():
         revised = plan_actions(reflection, selected_model)
         if revised:
@@ -308,24 +286,20 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
 
 
 def format_results(results):
-    lines = []
-    for t, v in results.items():
-        if isinstance(v, list):
-            for item in v:
-                if isinstance(item, dict):
-                    title = item.get("subject") or item.get("title")
-                    when = item.get("start") or ""
-                    snippet = item.get("snippet", "")[:120]
-                    lines.append(f"\u2022 {title} {when} — {snippet}")
-                else:
-                    lines.append(f"\u2022 {item}")
-        elif isinstance(v, dict):
-            title = v.get("title") or v.get("subject")
-            when = v.get("start") or ""
-            lines.append(f"\u2022 {title} {when}")
+    out = []
+    for kind, items in results.items():
+        if isinstance(items, list):
+            for it in items:
+                subj = it.get("subject") or it.get("title", "")
+                when = it.get("start", "")[:16]
+                out.append(f"\u2022 {subj}  {when}")
+        elif isinstance(items, dict):
+            subj = items.get("subject") or items.get("title", "")
+            when = items.get("start", "")[:16]
+            out.append(f"\u2022 {subj}  {when}")
         else:
-            lines.append(str(v))
-    return "\n".join(lines)
+            out.append(str(items))
+    return "\n".join(out)
 
 
 def _extract_minutes(text: str) -> Optional[int]:

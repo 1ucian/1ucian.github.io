@@ -4,7 +4,14 @@ import requests
 import logging
 
 BASE_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-MODEL_NAME = os.getenv("LLM_MODEL", "qwen3:30b-a3b")
+MODEL_NAME = os.getenv("LLM_MODEL", "qwen3:72b-a14b")
+
+try:
+    requests.get(BASE_URL, timeout=3)
+except Exception:
+    print(
+        f"\u26a0\ufe0f Ollama not reachable at {BASE_URL}. Start with:  ollama serve && ollama run {MODEL_NAME}"
+    )
 
 # Backwards compatibility
 OLLAMA_URL = BASE_URL
