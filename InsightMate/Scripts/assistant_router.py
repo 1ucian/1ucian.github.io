@@ -20,6 +20,7 @@ from calendar_reader import (
     list_events_for_day,
     search_events,
     create_event,
+    list_events_for_range,
 )
 from dateparser import parse as parse_date
 from reminder_scheduler import (
@@ -51,6 +52,9 @@ TOOL_REGISTRY = {
         list_events_for_day(parse_date(a.get("date", "today")).strftime("%Y-%m-%d"))
         if parse_date(a.get("date", "today")) else "\u26a0\ufe0f Invalid date"
     ),
+    "get_calendar_range": lambda a: list_events_for_range(
+        a.get("start"), a.get("end")
+    ),
     "summarize": lambda a: summarize_text(
         last_tool_output.get(
             a.get("source") or next(iter(last_tool_output), None),
@@ -78,13 +82,19 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
 
     planning_prompt = f"""You are an AI planner. Based on the user's input, decide which tools to use. Output a JSON list.
 
+IMPORTANT:
+- If the user asks anything about "calendar", "week", "day", or "event", prefer using "get_calendar".
+- Do not use "search_email" unless "email", "inbox", or a specific sender/keyword is mentioned.
+- Support ranges like "this week", "tomorrow", or "Monday to Friday" using get_calendar.
+
 User prompt:
 {user_prompt}
 
 Example response:
 [
-  {{ "type": "search_email", "query": "abfas" }},
-  {{ "type": "get_calendar", "date": "2025-07-10" }}
+  {{ "type": "search_email", "query": "meeting notes" }},
+  {{ "type": "get_calendar", "date": "2025-07-10" }},
+  {{ "type": "get_calendar_range", "start": "2025-07-10", "end": "2025-07-17" }}
 ]
 """
 
@@ -310,13 +320,23 @@ def plan_then_answer(user_prompt: str):
 
 
 def format_results(results):
-    reply = []
+    lines = []
     for k, v in results.items():
         if isinstance(v, list):
-            reply.append(f"{k}:\n" + "\n".join(str(i) for i in v))
+            for item in v:
+                if isinstance(item, dict):
+                    lines.append(
+                        f"{k}: " + " | ".join(f"{ik}: {iv}" for ik, iv in item.items())
+                    )
+                else:
+                    lines.append(f"{k}: {item}")
+        elif isinstance(v, dict):
+            lines.append(
+                f"{k}: " + " | ".join(f"{ik}: {iv}" for ik, iv in v.items())
+            )
         else:
-            reply.append(f"{k}: {v}")
-    return "\n\n".join(reply)
+            lines.append(f"{k}: {v}")
+    return "\n".join(lines)
 
 
 def _extract_minutes(text: str) -> Optional[int]:
