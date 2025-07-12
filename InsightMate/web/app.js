@@ -61,9 +61,17 @@ function fetchData() {
   fetch('/tasks').then(r => r.json()).then(d => {
     renderList(taskDiv, d.tasks || [], t => `${t.schedule} - ${t.description}`);
   }).catch(() => {});
-  fetch('/memory').then(r => r.json()).then(d => {
-    renderList(memoryDiv, d.messages || [], m => `${m.sender}: ${m.text}`);
-  }).catch(() => {});
+  fetch('/memory')
+    .then(res => res.json())
+    .then(data => {
+      console.log('Memory data:', data);
+      renderList(
+        memoryDiv,
+        data || [],
+        m => `${m.user}: ${m.assistant}`
+      );
+    })
+    .catch(() => {});
 }
 
 function applyTheme(theme) {
