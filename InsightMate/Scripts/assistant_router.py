@@ -41,7 +41,7 @@ from memory_db import (
 )
 from summarizer import summarize_text
 from llm_client import chat_completion, gpt
-from user_settings import get_selected_model
+from server_common import _load_model
 
 last_tool_output = {}
 
@@ -62,7 +62,7 @@ TOOL_REGISTRY = {
     "schedule_event": lambda a: create_event(
         f"{a.get('title', 'Appointment')} {a.get('time', '21:00')}"
     ),
-    "chat": lambda a: gpt(a.get("prompt", "Say hello"), a.get("model", "qwen:30b-a3b"))
+    "chat": lambda a: gpt(a.get("prompt", "Say hello"), a.get("model", _load_model()))
 }
 
 load_dotenv()
@@ -231,7 +231,7 @@ def gpt(prompt: str, model: str | None = None, cot_mode: bool = False) -> str:
         else:
             llm_name = llm
         return chat_completion(llm_name, messages)
-    llm_name = llm if llm else "qwen:30b-a3b"
+    llm_name = llm if llm else _load_model()
     return chat_completion(llm_name, messages)
 
 
@@ -264,10 +264,10 @@ def generate_response(user_prompt: str, data: dict, cot_mode: bool) -> str:
 
 
 
-def plan_then_answer(user_prompt: str, model: str = "qwen:30b-a3b"):
+def plan_then_answer(user_prompt: str, model: str | None = None):
     """Plan actions for ``user_prompt`` then execute them."""
     global last_tool_output
-    selected_model = model or get_selected_model()
+    selected_model = model or _load_model()
     prompt_clean = user_prompt.lower().strip()
 
     # Casual conversation fallback
@@ -367,7 +367,7 @@ def _extract_minutes(text: str) -> Optional[int]:
 
 
 def route(query: str) -> str:
-    selected_model = get_selected_model()
+    selected_model = _load_model()
     cot_mode = False
     q = query.lower()
     if "/think" in q:

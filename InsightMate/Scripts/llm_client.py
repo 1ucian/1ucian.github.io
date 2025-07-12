@@ -26,5 +26,12 @@ def chat_completion(model: str, messages: list[dict]) -> str:
         )
         resp.raise_for_status()
         return resp.json()["message"]["content"].strip()
+    except requests.HTTPError as e:
+        if e.response is not None and e.response.status_code == 404:
+            return (
+                f"\u26a0\ufe0f Model '{model}' not found. "
+                f"Run `ollama pull {model}` or choose another model in Settings."
+            )
+        return f"\u26a0\ufe0f Qwen API error: {str(e)}"
     except Exception as e:
         return f"\u26a0\ufe0f Qwen API error: {str(e)}"

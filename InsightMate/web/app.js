@@ -98,16 +98,24 @@ resetMemoryBtn.addEventListener('click', () => {
 
 function loadSettings() {
   const theme = localStorage.getItem('theme') || 'dark';
-  const model = localStorage.getItem('model') || 'gpt-4o';
   themeSelect.value = theme;
-  modelSelect.value = model;
   applyTheme(theme);
+  fetch('/model')
+    .then(r => r.json())
+    .then(cfg => {
+      document.querySelector('#model-select').value = cfg.model || '';
+    })
+    .catch(() => {});
 }
 
 function saveSettings() {
   localStorage.setItem('theme', themeSelect.value);
-  localStorage.setItem('model', modelSelect.value);
   applyTheme(themeSelect.value);
+  fetch('/model', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: modelSelect.value })
+  }).catch(() => {});
 }
 
 function sendMessage() {
@@ -119,13 +127,13 @@ function sendMessage() {
   fetch('/chat', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({query: text, model: localStorage.getItem('model') || 'gpt-4o'})
+    body: JSON.stringify({query: text})
   })
   .then(res => res.json())
   .then(data => {
     const duration = (Date.now() - start) / 1000;
     if (data.error) {
-      if (data.error.indexOf('Qwen API') > -1) {
+      if (data.error && data.error.indexOf('Qwen API') > -1) {
         alert('⚠️ InsightMate backend LLM is offline. Start Ollama with:  `ollama serve` ');
       }
       addMessage('Error', data.error);
