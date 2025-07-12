@@ -72,24 +72,24 @@ def _get_config():
 
 def plan_actions(user_prompt: str, model: str) -> list[dict]:
     """Map the user's prompt to a list of tool actions."""
-    planning_prompt = f"""
-You are a planner. Your job is to convert the user's message into a JSON list of tool calls.
-
-Available tools and arguments:
-- search_email        {{ "type": "search_email", "query": "<keywords or dates>" }}
-- get_calendar        {{ "type": "get_calendar", "date": "<relative or ISO date>" }}
-- get_calendar_range  {{ "type": "get_calendar_range", "start": "<start>", "end": "<end>" }}
-- summarize           {{ "type": "summarize" }}   # summarise last tool result
-- chat                {{ "type": "chat" }}        # plain conversation
-
-Rules:
-1. ALWAYS think from the user’s exact words; do NOT assume hard-coded phrases.
-2. Choose 1–3 tools. If nothing fits, return [{"type":"chat"}].
-3. Output ONLY the JSON list — no extra text.
-
-User message:
-{user_prompt}
-"""
+    planning_prompt = (
+        "You are a planner. Convert the user’s message into a JSON list of tools.\n"
+        "\n"
+        "Available tools:\n"
+        "- search_email        { \"type\": \"search_email\", \"query\": \"<keywords>\" }\n"
+        "- get_calendar        { \"type\": \"get_calendar\", \"date\": \"<date>\" }\n"
+        "- get_calendar_range  { \"type\": \"get_calendar_range\", \"start\": \"<start>\", \"end\": \"<end>\" }\n"
+        "- summarize           { \"type\": \"summarize\" }\n"
+        "- chat                { \"type\": \"chat\" }\n"
+        "\n"
+        "RULES:\n"
+        "1. Think from the user text only; no hard-coded commands.\n"
+        "2. Return 1-3 tools. If nothing fits, return [ {\"type\":\"chat\"} ].\n"
+        "3. Output **only** the JSON list, no commentary.\n"
+        "\n"
+        "User message:\n"
+        f"{user_prompt}"
+    )
 
     response = chat_completion(
         model,
