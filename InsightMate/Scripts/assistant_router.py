@@ -158,7 +158,12 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
 
 
 def _normalise(action: dict) -> dict:
-    """Ensure planner actions use the 'type' key."""
+    """Ensure planner actions use the 'type' key and clean stray quotes."""
+    cleaned = {}
+    for k, v in action.items():
+        key = k.strip().strip('"').strip("'")
+        cleaned[key] = v
+    action = cleaned
     if "type" in action:
         return action
     if "tool" in action:
