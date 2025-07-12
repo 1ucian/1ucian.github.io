@@ -1,5 +1,5 @@
 from llm_client import gpt
-from server_common import _load_model
+from user_settings import get_selected_model
 
 
 def summarize_text(text_or_list):
@@ -9,4 +9,5 @@ def summarize_text(text_or_list):
     else:
         text = str(text_or_list)
     prompt = "Summarize this:\n" + text
-    return gpt(prompt, model=_load_model())
+    model = get_selected_model()
+    return gpt(prompt, model=model)
