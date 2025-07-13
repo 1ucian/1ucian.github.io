@@ -4,21 +4,18 @@ import json
 
 
 def summarize_text(obj):
-    """Summarize ``obj`` using Qwen. Lists are converted to text."""
+    """Summarize ``obj`` using the active language model."""
     if obj in (None, "", "\u26a0\ufe0f No previous tool output"):
         return "\u26a0\ufe0f Nothing to summarize."
     if isinstance(obj, list):
         text = "\n".join(
-            (it.get("subject") or it.get("title", "")) + " " + it.get("snippet", "")
-            for it in obj
+            (item.get("subject") or item.get("title", "")) + " " + item.get("snippet", "")
+            for item in obj
         )
     elif isinstance(obj, dict):
         text = json.dumps(obj, indent=2)[:4000]
     else:
-        text = str(text_or_list)
+        text = str(obj)
     prompt = "Summarize this:\n" + text
     model = get_selected_model()
     return gpt(prompt, model=model)
-        text = str(obj)
-    prompt = "Write a single coherent paragraph summarising this:\n" + text
-    return gpt(prompt, model="qwen3:30b-a3b")

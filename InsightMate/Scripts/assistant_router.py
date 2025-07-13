@@ -125,8 +125,8 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
         "• If user adds an event like “add 5 pm dinner”, emit **schedule_event**.\n"
         "• If user says “change 5 pm today”, emit get_calendar + schedule_event (update).\n"
         "• If user asks follow-up (“titles”, “summary”, “all of them”), emit summarize.\n"
-        "• If user says \"list calendar\" or \"calendar events today\":\n  output [{ \"type\":\"get_calendar\",\"date\":\"today\" }]\n"
-        "• If user says \"list emails\" or \"emails today\":\n  output [{ \"type\":\"search_email\", \"query\": \"today\" }]\n\n"
+        "• If user says \"list calendar\" or \"calendar events today\":\n  output [{{ \"type\":\"get_calendar\",\"date\":\"today\" }}]\n"
+        "• If user says \"list emails\" or \"emails today\":\n  output [{{ \"type\":\"search_email\", \"query\": \"today\" }}]\n\n"
         "Only output the JSON array. No <think> tags.\n"
         "User message:\n{msg}\n"
     ).format(msg=user_prompt.replace('{', '[').replace('}', ']'))
@@ -170,7 +170,50 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
             f.write(response)
         return [{"type": "chat", "prompt": "Invalid plan format."}]
 
+    if isinstance(plan, dict):
+        plan = [plan]
+    if not isinstance(plan, list):
+        return [{"type": "chat"}]
 
+    out = []
+    for a in plan:
+        if not isinstance(a, dict):
+            continue
+        a = _normalise(a)
+        if "type" in a:
+            out.append(a)
+    return out
+
+
+def _normalise(action: dict) -> dict:
+    """Ensure planner actions use the 'type' key and clean stray quotes."""
+    if not isinstance(action, dict):
+        if isinstance(action, str):
+            try:
+                action = json.loads(action)
+                if not isinstance(action, dict):
+                    action = json.loads(action)
+            except Exception:
+                return {}
+        else:
+            try:
+                action = json.loads(str(action))
+                if not isinstance(action, dict):
+                    action = json.loads(action)
+            except Exception:
+                return {}
+    cleaned = {}
+    for k, v in action.items():
+        key = str(k).strip().strip('"').strip("'").strip()
+        cleaned[key] = v
+    action = cleaned
+    if "type" in action:
+        return action
+    if "tool" in action:
+        action["type"] = action.pop("tool")
+    elif "action" in action:
+        action["type"] = action.pop("action")
+    return action
 
 
 def _get_location() -> str:
@@ -326,6 +369,7 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     logging.info("PLAN %s", actions)
     normalised = []
     for a in actions:
+        logging.info("RAW action from planner: %r", a)
         try:
             a = _normalise(a)
         except Exception as e:
@@ -334,10 +378,9 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
         normalised.append(a)
     actions = normalised
 
-    for a in actions:
-        if "type" not in a:
-            logging.error("missing type in action: %s", a)
-            return "\u26a0\ufe0f Planner output lacked 'type'. Please retry."
+    if any("type" not in a for a in actions):
+        logging.error("planner omitted 'type' in %s", actions)
+        actions = [{"type": "chat", "prompt": "I'm not sure what to do."}]
 
     if actions == [{"type": "chat"}]:
         return "\u26a0\ufe0f I couldn't find any relevant action. Try rephrasing."

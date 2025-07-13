@@ -32,9 +32,10 @@ function processThought(text, durationSec) {
   return text;
 }
 
-function addMessage(sender, text) {
+function addMessage(sender, text, isError = false) {
   const div = document.createElement('div');
   div.classList.add('message', sender === 'You' ? 'you' : 'assistant');
+  if (isError) div.classList.add('error-banner');
   const span = document.createElement('span');
   div.innerHTML = `<strong>${sender}:</strong> `;
   div.appendChild(span);
@@ -136,14 +137,15 @@ function sendMessage() {
       if (data.error && data.error.indexOf('LLM error') > -1) {
         alert('⚠️ InsightMate backend LLM is offline. Start Ollama with:  `ollama serve` ');
       }
-      addMessage('Error', data.error);
+      addMessage('Error', data.error, true);
       return;
     }
     const msg = processThought(data.reply, duration);
-    addMessage('Assistant', msg);
+    const isErr = (data.reply || '').trim().startsWith('⚠️');
+    addMessage('Assistant', msg, isErr);
   })
   .catch(err => {
-    addMessage('Error', err.toString());
+    addMessage('Error', err.toString(), true);
   })
   .finally(fetchData);
 }

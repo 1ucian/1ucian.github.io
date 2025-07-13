@@ -13,6 +13,10 @@
   color: #fff;
   align-self: flex-start;
 }
+.message.error-banner {
+  background-color: #dc3545;
+  color: #fff;
+}
 body.light {
   background-color: #fff !important;
   color: #000 !important;
@@ -23,6 +27,10 @@ body.light .message.assistant {
 }
 body.light .message.you {
   background-color: #0d6efd;
+}
+body.light .message.error-banner {
+  background-color: #f44336;
+  color: #fff;
 }
 
 details {
