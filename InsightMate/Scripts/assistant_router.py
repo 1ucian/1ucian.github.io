@@ -125,8 +125,8 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
         "• If user adds an event like “add 5 pm dinner”, emit **schedule_event**.\n"
         "• If user says “change 5 pm today”, emit get_calendar + schedule_event (update).\n"
         "• If user asks follow-up (“titles”, “summary”, “all of them”), emit summarize.\n"
-        "• If user says \"list calendar\" or \"calendar events today\":\n  output [{ \"type\":\"get_calendar\",\"date\":\"today\" }]\n"
-        "• If user says \"list emails\" or \"emails today\":\n  output [{ \"type\":\"search_email\", \"query\": \"today\" }]\n\n"
+        "• If user says \"list calendar\" or \"calendar events today\":\n  output [{{ \"type\":\"get_calendar\",\"date\":\"today\" }}]\n"
+        "• If user says \"list emails\" or \"emails today\":\n  output [{{ \"type\":\"search_email\", \"query\": \"today\" }}]\n\n"
         "Only output the JSON array. No <think> tags.\n"
         "User message:\n{msg}\n"
     ).format(msg=user_prompt.replace('{', '[').replace('}', ']'))
