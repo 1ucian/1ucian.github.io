@@ -170,7 +170,37 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
             f.write(response)
         return [{"type": "chat", "prompt": "Invalid plan format."}]
 
+    if isinstance(plan, dict):
+        plan = [plan]
+    if not isinstance(plan, list):
+        return [{"type": "chat"}]
 
+    out = []
+    for a in plan:
+        if not isinstance(a, dict):
+            continue
+        a = _normalise(a)
+        if "type" in a:
+            out.append(a)
+    return out
+
+
+def _normalise(action: dict) -> dict:
+    """Ensure planner actions use the 'type' key and clean stray quotes."""
+    if not isinstance(action, dict):
+        return {}
+    cleaned = {}
+    for k, v in action.items():
+        key = str(k).strip().strip('"').strip("'")
+        cleaned[key] = v
+    action = cleaned
+    if "type" in action:
+        return action
+    if "tool" in action:
+        action["type"] = action.pop("tool")
+    elif "action" in action:
+        action["type"] = action.pop("action")
+    return action
 
 
 def _get_location() -> str:
