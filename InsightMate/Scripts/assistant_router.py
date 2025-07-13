@@ -188,10 +188,16 @@ def plan_actions(user_prompt: str, model: str) -> list[dict]:
 def _normalise(action: dict) -> dict:
     """Ensure planner actions use the 'type' key and clean stray quotes."""
     if not isinstance(action, dict):
-        return {}
+        if isinstance(action, str):
+            try:
+                action = json.loads(action)
+            except Exception:
+                return {}
+        else:
+            return {}
     cleaned = {}
     for k, v in action.items():
-        key = str(k).strip().strip('"').strip("'")
+        key = str(k).strip().strip('"').strip("'").strip()
         cleaned[key] = v
     action = cleaned
     if "type" in action:
@@ -356,6 +362,7 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
     logging.info("PLAN %s", actions)
     normalised = []
     for a in actions:
+        logging.info("RAW action from planner: %r", a)
         try:
             a = _normalise(a)
         except Exception as e:
@@ -364,10 +371,9 @@ def plan_then_answer(user_prompt: str, model: str | None = None):
         normalised.append(a)
     actions = normalised
 
-    for a in actions:
-        if "type" not in a:
-            logging.error("missing type in action: %s", a)
-            return "\u26a0\ufe0f Planner output lacked 'type'. Please retry."
+    if any("type" not in a for a in actions):
+        logging.error("planner omitted 'type' in %s", actions)
+        actions = [{"type": "chat", "prompt": "I'm not sure what to do."}]
 
     if actions == [{"type": "chat"}]:
         return "\u26a0\ufe0f I couldn't find any relevant action. Try rephrasing."
