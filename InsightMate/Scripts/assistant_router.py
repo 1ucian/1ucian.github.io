@@ -191,10 +191,17 @@ def _normalise(action: dict) -> dict:
         if isinstance(action, str):
             try:
                 action = json.loads(action)
+                if not isinstance(action, dict):
+                    action = json.loads(action)
             except Exception:
                 return {}
         else:
-            return {}
+            try:
+                action = json.loads(str(action))
+                if not isinstance(action, dict):
+                    action = json.loads(action)
+            except Exception:
+                return {}
     cleaned = {}
     for k, v in action.items():
         key = str(k).strip().strip('"').strip("'").strip()

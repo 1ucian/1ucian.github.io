@@ -12,3 +12,8 @@ def test_string_plan():
     out = [ar._normalise(item) for item in json.loads(plan_str)]
     assert out == [{"type": "search_email"}]
 
+
+def test_double_quoted_plan():
+    plan_str = '"{\\"tool\\":\\"search_email\\"}"'
+    assert ar._normalise(plan_str) == {"type": "search_email"}
+
