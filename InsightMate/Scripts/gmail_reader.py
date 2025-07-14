@@ -131,9 +131,16 @@ def search_emails(query: str, limit: int = 5, include_body: bool = False):
         .execute()
     )
     messages = results.get('messages', [])
+
     output = []
+    seen: set[str] = set()
     for m in messages:
-        output.append(_msg_to_dict(service, m['id'], include_body=include_body))
+        msg_id = m.get('id')
+        if not msg_id or msg_id in seen:
+            continue
+        seen.add(msg_id)
+        output.append(_msg_to_dict(service, msg_id, include_body=include_body))
+
     return output
 
 
