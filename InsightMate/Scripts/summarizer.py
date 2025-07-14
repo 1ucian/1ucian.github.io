@@ -17,5 +17,4 @@ def summarize_text(obj):
     else:
         text = str(obj)
     prompt = "Summarize this:\n" + text
-    model = get_selected_model()
-    return gpt(prompt, model=model)
+    return gpt(prompt, model=get_selected_model())

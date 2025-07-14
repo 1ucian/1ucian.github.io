@@ -7,6 +7,30 @@ import os
 
 from google_auth import get_credentials
 
+# ------------- NEW HELPERS -------------
+from datetime import datetime, timedelta, timezone
+
+# Always translate user keywords in Pacific Time (InsightMate standard)
+PT = timezone(timedelta(hours=-7))
+
+def _date_filter(word: str) -> str:
+    """Translate natural-language date words to Gmail after/before filters."""
+    today = datetime.now(PT).date()
+
+    table = {
+        "today":       (today,                   today + timedelta(days=1)),
+        "yesterday":   (today - timedelta(days=1), today),
+        "tomorrow":    (today + timedelta(days=1), today + timedelta(days=2)),
+        "last 7 days": (today - timedelta(days=7), today + timedelta(days=1)),
+        "past week":   (today - timedelta(days=7), today + timedelta(days=1)),
+    }
+
+    if word in table:
+        start, end = table[word]
+        return f"after:{start:%Y/%m/%d} before:{end:%Y/%m/%d}"
+    return word
+# ---------------------------------------
+
 
 def _get_body(msg: dict) -> str:
     """Return the plain text body from a Gmail message."""
@@ -56,11 +80,17 @@ def fetch_unread_email(include_body: bool = False):
 
 def search_emails(query: str, limit: int = 5, include_body: bool = False):
     """Return list of emails matching the Gmail search query."""
+    # 🔄 Normalise "today", "yesterday", etc.
+    query = _date_filter(query.strip().lower())
+
     creds = get_credentials()
     service = build('gmail', 'v1', credentials=creds)
-    results = service.users().messages().list(
-        userId='me', q=query, maxResults=limit
-    ).execute()
+    results = (
+        service.users()
+        .messages()
+        .list(userId='me', q=query, maxResults=limit)
+        .execute()
+    )
     messages = results.get('messages', [])
     output = []
     for m in messages:
