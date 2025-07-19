@@ -13,16 +13,16 @@ This repository contains the source for my personal site as well as **InsightMat
    ```
 3. Copy `.env.example` to `.env` and set the environment values:
    - `OPENAI_API_KEY` for GPT‑4o or GPT‑4 (leave blank for Qwen3)
+   - `N8N_URL` and `N8N_API_KEY` for the n8n backend
    - `EMAIL_DOMAIN` for recipient addresses without a domain
    - `LATITUDE` and `LONGITUDE` for weather and air‑quality checks
-4. Place your Google API `credentials.json` in the `Scripts` directory and run `python gmail_reader.py` once to authorize Gmail and Calendar access. This creates `token.json` for future runs.
-5. Start the server:
+4. Start the server:
 
    ```bash
    python chat_server.py
    ```
 
-6. Open `http://<host>:5000/` in your browser (replace `<host>` with your computer's address). The server listens on all network interfaces so it can be reached from other devices on the same network.
+5. Open `http://<host>:5000/` in your browser (replace `<host>` with your computer's address). The server listens on all network interfaces so it can be reached from other devices on the same network.
 
 By default InsightMate uses the local **qwen3:30b-a3b** model. You can switch models from the Settings panel in the web UI.
 
