@@ -12,12 +12,22 @@ import re
 from dotenv import load_dotenv
 from config import load_config, get_api_key, get_llm, get_prompt
 
-from gmail_reader import search_emails
+from gmail_reader import search_emails as _local_search_emails
 from calendar_reader import (
-    list_events_for_day,
-    list_events_for_range,
-    create_event,
+    list_events_for_day as _local_list_events_for_day,
+    list_events_for_range as _local_list_events_for_range,
+    create_event as _local_create_event,
 )
+try:
+    from n8n_client import (
+        USE_N8N,
+        search_emails,
+        list_events_for_day,
+        list_events_for_range,
+        create_event,
+    )
+except Exception:
+    USE_N8N = False
 from dateparser import parse as parse_date
 from date_utils import date_keyword, today_pt
 from reminder_scheduler import (
@@ -64,17 +74,29 @@ last_tool_output = {}
 
 def _search_email(a):
     try:
-        return search_emails(a.get("query") or "today")
+        if USE_N8N:
+            return search_emails(a.get("query") or "today")
+        return _local_search_emails(a.get("query") or "today")
     except Exception as e:
         return f"\u26a0\ufe0f email error: {e}"
 
 TOOL_REGISTRY = {
     "search_email": _search_email,
-    "get_calendar": lambda a: list_events_for_day(
-        parse_date(a.get("date", "today")).strftime("%Y-%m-%d")
-    ) if parse_date(a.get("date", "today")) else "\u26a0\ufe0f Invalid date",
-    "get_calendar_range": lambda a: list_events_for_range(
-        a.get("start"), a.get("end")
+    "get_calendar": lambda a: (
+        list_events_for_day(
+            parse_date(a.get("date", "today")).strftime("%Y-%m-%d")
+        )
+        if USE_N8N
+        else _local_list_events_for_day(
+            parse_date(a.get("date", "today")).strftime("%Y-%m-%d")
+        )
+    )
+    if parse_date(a.get("date", "today"))
+    else "\u26a0\ufe0f Invalid date",
+    "get_calendar_range": lambda a: (
+        list_events_for_range(a.get("start"), a.get("end"))
+        if USE_N8N
+        else _local_list_events_for_range(a.get("start"), a.get("end"))
     ),
     "summarize": lambda a: summarize_text(
         last_tool_output.get(
@@ -98,7 +120,9 @@ def _schedule(a):
     else:
         date = today_pt()
     title = a.get("title", "Appointment")
-    return create_event(f"{title} {date} {when}")
+    if USE_N8N:
+        return create_event(f"{title} {date} {when}")
+    return _local_create_event(f"{title} {date} {when}")
 
 load_dotenv()
 
