@@ -7,6 +7,69 @@ import os
 
 from google_auth import get_credentials
 
+# ------------- NEW HELPERS -------------
+from datetime import datetime, timedelta, timezone
+import re
+from dateparser import parse as parse_date
+
+# Always translate user keywords in Pacific Time (InsightMate standard)
+PT = timezone(timedelta(hours=-7))
+
+def _date_filter(text: str) -> str:
+    """Return Gmail after/before filters for natural-language date expressions."""
+    text = text.strip().lower()
+    today = datetime.now(PT).date()
+
+    # last N days / past N days
+    m = re.search(r"(?:last|past)\s+(\d+)\s+days?", text)
+    if m:
+        n = int(m.group(1))
+        start = today - timedelta(days=n)
+        end = today + timedelta(days=1)
+        return f"after:{start:%Y/%m/%d} before:{end:%Y/%m/%d}"
+
+    # next N days
+    m = re.search(r"next\s+(\d+)\s+days?", text)
+    if m:
+        n = int(m.group(1))
+        start = today
+        end = today + timedelta(days=n + 1)
+        return f"after:{start:%Y/%m/%d} before:{end:%Y/%m/%d}"
+
+    if "last week" in text or "past week" in text:
+        start = today - timedelta(days=7)
+        end = today + timedelta(days=1)
+        return f"after:{start:%Y/%m/%d} before:{end:%Y/%m/%d}"
+
+    if "next week" in text:
+        start = today + timedelta(days=1)
+        end = today + timedelta(days=8)
+        return f"after:{start:%Y/%m/%d} before:{end:%Y/%m/%d}"
+
+    # range expressions "from X to Y" / "between X and Y"
+    range_match = re.search(
+        r"(?:from|between)\s+([^\n]+?)\s+(?:to|and)\s+([^\n]+)",
+        text,
+    )
+    if range_match:
+        start_str, end_str = range_match.groups()
+        start_dt = parse_date(start_str, settings={"RELATIVE_BASE": datetime.now(PT)})
+        end_dt = parse_date(end_str, settings={"RELATIVE_BASE": datetime.now(PT)})
+        if start_dt and end_dt:
+            start = start_dt.date()
+            end = end_dt.date() + timedelta(days=1)
+            return f"after:{start:%Y/%m/%d} before:{end:%Y/%m/%d}"
+
+    # single date
+    parsed = parse_date(text, settings={"RELATIVE_BASE": datetime.now(PT)})
+    if parsed:
+        start = parsed.date()
+        end = start + timedelta(days=1)
+        return f"after:{start:%Y/%m/%d} before:{end:%Y/%m/%d}"
+
+    return text
+# ---------------------------------------
+
 
 def _get_body(msg: dict) -> str:
     """Return the plain text body from a Gmail message."""
@@ -56,15 +119,28 @@ def fetch_unread_email(include_body: bool = False):
 
 def search_emails(query: str, limit: int = 5, include_body: bool = False):
     """Return list of emails matching the Gmail search query."""
+    # 🔄 Normalise "today", "yesterday", etc.
+    query = _date_filter(query.strip().lower())
+
     creds = get_credentials()
     service = build('gmail', 'v1', credentials=creds)
-    results = service.users().messages().list(
-        userId='me', q=query, maxResults=limit
-    ).execute()
+    results = (
+        service.users()
+        .messages()
+        .list(userId='me', q=query, maxResults=limit)
+        .execute()
+    )
     messages = results.get('messages', [])
+
     output = []
+    seen: set[str] = set()
     for m in messages:
-        output.append(_msg_to_dict(service, m['id'], include_body=include_body))
+        msg_id = m.get('id')
+        if not msg_id or msg_id in seen:
+            continue
+        seen.add(msg_id)
+        output.append(_msg_to_dict(service, msg_id, include_body=include_body))
+
     return output
 
 
