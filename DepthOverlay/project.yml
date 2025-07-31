@@ -1,0 +1,15 @@
+name: DepthOverlay
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: '16.0'
+targets:
+  DepthOverlayApp:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    info:
+      path: Info.plist
+      properties:
+        UILaunchScreen:
+          UILaunchStoryboardsName: LaunchScreen
