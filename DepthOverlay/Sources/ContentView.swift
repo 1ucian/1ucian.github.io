@@ -52,7 +52,7 @@ struct ContentView: View {
                let uiImage = UIImage(data: data) {
                 self.pickedImage = uiImage
             }
-            if let id = item.assetIdentifier {
+            if let id = item.itemIdentifier {
                 fetchDepth(assetID: id)
             }
         }
