@@ -5,7 +5,7 @@
     <key>CFBundleDisplayName</key>
     <string>DepthOverlay</string>
     <key>CFBundleIdentifier</key>
-    <string>com.example.DepthOverlay</string>
+    <string>com.example.DepthOverlayApp</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleName</key>
